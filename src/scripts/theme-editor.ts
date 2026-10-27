@@ -1,6 +1,6 @@
 import { renderDesignedEmail } from "../plugins/newsletter/email-designed.ts";
 import { DEFAULT_SETTINGS, type Settings } from "../plugins/newsletter/settings.ts";
-import { checkTheme, DEFAULT_THEME, type Theme, type ThemeCheck, type ThemePatch } from "../plugins/newsletter/theme.ts";
+import { checkTheme, DEFAULT_THEME, type Theme, type ThemeCheck, themeChanges } from "../plugins/newsletter/theme.ts";
 import { plugin, uploadImage } from "./emdash-api.ts";
 import { previewFrame } from "./preview-frame.ts";
 
@@ -120,23 +120,9 @@ export function startThemeEditor(root: HTMLElement) {
     if (!bad.length) render();
   }
 
-  // Only the fields that differ from the saved theme, so saving doesn't undo
-  // a change made meanwhile elsewhere (Claude, another editor) to fields
-  // nobody touched here.
-  function changes(): ThemePatch {
-    const patch: Record<string, unknown> = {};
-    for (const key of Object.keys(theme) as (keyof Theme)[]) {
-      if (key === "colors" || key === "banner") {
-        // Colours compare without case: the form shows them in lower case.
-        const was = saved[key] as Record<string, unknown>;
-        const part = Object.fromEntries(
-          Object.entries(theme[key]).filter(([k, v]) => String(v).toLowerCase() !== String(was[k]).toLowerCase()),
-        );
-        if (Object.keys(part).length) patch[key] = part;
-      } else if (theme[key] !== saved[key]) patch[key] = theme[key];
-    }
-    return patch as ThemePatch;
-  }
+  // Only what differs from the saved theme (the form shows colours in lower
+  // case; themeChanges compares them without case).
+  const changes = () => themeChanges(saved, theme);
 
   function showProblems({ errors, warnings }: ThemeCheck) {
     problems.replaceChildren(

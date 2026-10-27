@@ -80,7 +80,7 @@
 		"type": "sqlite",
 		"executorEntrypoint": "emdash/db/sqlite-migrations",
 		"executorConfig": {
-			"url": "file:/Users/andrew/newsletteditor/data/newsletter.db"
+			"url": "file:/Users/andrew/newsleditor/data/newsletter.db"
 		}
 	}
 }

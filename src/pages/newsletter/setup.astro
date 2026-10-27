@@ -1,0 +1,484 @@
+---
+import { Role } from "@emdash-cms/auth";
+import Newsletter from "../../layouts/Newsletter.astro";
+import { canEdit, getSettings } from "../../lib/newsletter";
+
+// First-run setup, after EmDash's own (which makes the first visitor an
+// Admin): the newsletter's name, sender, schedule and signature, a theme
+// suggested from its logo, the voice Claude drafts in, where images live, and
+// connecting Claude. Editors are sent here until it's saved
+// (src/middleware.ts); afterwards it's the Settings page. Saved through the
+// newsletter plugin's settings-update and theme-update routes
+// (src/scripts/setup.ts).
+
+export const prerender = false;
+
+const user = Astro.locals.user;
+if (!user) {
+  return Astro.redirect(`/_emdash/admin/login?redirect=${encodeURIComponent(Astro.url.pathname)}`);
+}
+const allowed = canEdit(user);
+if (!allowed) Astro.response.status = 403;
+const admin = user.role >= Role.ADMIN;
+
+const { settings, configured } = await getSettings();
+// What the server actually uses for images, from its environment.
+const storage = process.env.S3_BUCKET ? "bucket" : "local";
+const mcpUrl = new URL("/_emdash/api/mcp", Astro.url.origin).href;
+const days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+---
+
+<Newsletter title={configured ? "Settings" : "Set up your newsletter"}>
+  <section class="setup shell">
+    <h1 class="display setup__title">{configured ? "Settings" : "Set up your newsletter"}</h1>
+    {
+      allowed ? (
+        <form
+          class="setup__form"
+          data-setup
+          data-settings={JSON.stringify(settings)}
+          data-configured={configured ? "1" : ""}
+          data-admin={admin ? "1" : ""}
+          data-mcp-url={mcpUrl}
+          data-storage={storage}
+        >
+          {!configured && (
+            <p class="setup__intro prose">
+              A few questions and you're ready to write the first edition. Everything here can be changed later, on this
+              page or by asking Claude.
+            </p>
+          )}
+
+          <fieldset>
+            <legend>
+              <span class="setup__step">1</span> The basics
+            </legend>
+            <label>
+              Newsletter name
+              <input name="name" required maxlength="80" placeholder="Field Notes" />
+            </label>
+            <label>
+              Subject line
+              <input name="subject" required maxlength="160" />
+              <span class="setup__hint">
+                {"{name}"} is the name and {"{date}"} the edition's date: “{"{name}"} — {"{date}"}” becomes “Field Notes —
+                Oct 30, 2026”.
+              </span>
+            </label>
+            <div class="setup__row">
+              <label>
+                Sent by (name)
+                <input name="senderName" maxlength="120" placeholder="The Lab" />
+              </label>
+              <label>
+                Sender's email
+                <input name="senderEmail" type="email" maxlength="200" placeholder="lab@example.org" />
+              </label>
+            </div>
+            <div class="setup__row">
+              <label>
+                Goes out
+                <select name="weekday">
+                  <option value="">No fixed day</option>
+                  {days.map((day, i) => <option value={i}>Every {day}</option>)}
+                </select>
+              </label>
+              <label>
+                Time zone
+                <input name="timeZone" required maxlength="64" placeholder="America/New_York" />
+              </label>
+            </div>
+            <label>
+              Signature
+              <textarea name="signature" rows="4" maxlength="2000" placeholder={"Jane Doe\nEditor, Field Notes\n[example.org](https://example.org)"} />
+              <span class="setup__hint">Under every email, in markdown. Each line is a line.</span>
+            </label>
+            <details class="setup__more">
+              <summary>How a new edition starts</summary>
+              <label>
+                Starter text
+                <textarea name="starter" rows="10" maxlength="4000" class="setup__mono" />
+                <span class="setup__hint">
+                  Markdown. {"{day}"} is the weekday's name. [PLACEHOLDERS] in capitals are flagged in the studio until
+                  replaced.
+                </span>
+              </label>
+            </details>
+          </fieldset>
+
+          <fieldset>
+            <legend>
+              <span class="setup__step">2</span> The look
+            </legend>
+            <p class="setup__hint">
+              Upload your logo and the email takes its colours, made dark enough to read. Fine-tune everything on the{" "}
+              <a href="/newsletter/theme">Theme page</a> later.
+            </p>
+            <div class="setup__logo">
+              <img data-logo-img alt="" hidden />
+              <label class="setup__button">
+                Upload logo… <input type="file" accept="image/png,image/jpeg,image/gif" data-logo-file hidden />
+              </label>
+              <span class="setup__swatches" data-swatches />
+            </div>
+            <ul class="setup__problems" data-problems aria-live="polite" />
+            <iframe class="setup__preview" data-preview title="Email preview" sandbox="allow-same-origin" />
+          </fieldset>
+
+          <fieldset>
+            <legend>
+              <span class="setup__step">3</span> The voice
+            </legend>
+            <label>
+              How does it sound?
+              <textarea
+                name="voice"
+                rows="6"
+                maxlength="4000"
+                placeholder="Warm and a bit playful, never corporate. Short paragraphs. We say “we”, not “the team”. One emoji per section header at most. Quick hits end on the useful fact."
+              />
+              <span class="setup__hint">
+                For Claude when it drafts an edition: tone, words you use or avoid, how long things run. Your words, as you'd
+                tell a new editor.
+              </span>
+            </label>
+          </fieldset>
+
+          <fieldset>
+            <legend>
+              <span class="setup__step">4</span> Where images live
+            </legend>
+            <label class="setup__choice">
+              <input type="radio" name="images" value="local" />
+              <span>
+                <strong>On this computer</strong> (the data/media folder). Simplest; fine for drafting. Readers' mail apps
+                can't load images from here, so before sending, check the README's “Sending” section.
+              </span>
+            </label>
+            <label class="setup__choice">
+              <input type="radio" name="images" value="bucket" />
+              <span>
+                <strong>In an S3-compatible bucket</strong> (AWS S3, Cloudflare R2, MinIO, Backblaze B2…) with a public
+                address, so every reader's mail app can load them.
+              </span>
+            </label>
+            <p class="setup__warning" data-storage-note role="status" hidden />
+            <div class="setup__bucket" data-bucket hidden>
+              {
+                storage === "bucket" ? (
+                  <p class="setup__ok">This server is already using a bucket ({process.env.S3_BUCKET}).</p>
+                ) : (
+                  <>
+                    <p class="setup__hint">
+                      Set these where the server starts (a <code>.env</code> file next to <code>package.json</code> works),
+                      then restart it:
+                    </p>
+                    <pre class="setup__code">
+                      {`S3_ENDPOINT=https://<account>.r2.cloudflarestorage.com
+S3_BUCKET=newsletter-media
+S3_ACCESS_KEY_ID=...
+S3_SECRET_ACCESS_KEY=...
+S3_REGION=auto
+S3_PUBLIC_URL=https://media.example.org`}
+                    </pre>
+                  </>
+                )
+              }
+            </div>
+          </fieldset>
+
+          <p class="setup__actions">
+            <button type="submit" class="setup__save" data-save>{configured ? "Save settings" : "Save and continue"}</button>
+            <span class="setup__status" data-status role="status" />
+          </p>
+
+          <fieldset data-connect hidden={!configured}>
+            <legend>
+              <span class="setup__step">5</span> Connect Claude
+            </legend>
+            <p class="setup__hint">
+              Claude Code can then add things to the newsletter's inbox, start an edition in your voice, and change the
+              theme, through this site's MCP server. Its key can read and change all of this site's content and media, as
+              you can. Making a new connection here replaces the one made before, so other computers using that one
+              need the new command too.
+            </p>
+            {
+              admin ? (
+                <>
+                  <p>
+                    <button type="button" class="setup__button" data-connect-go>
+                      Make a connection for Claude Code
+                    </button>
+                  </p>
+                  <div data-connect-done hidden>
+                    <p class="setup__hint">Run this in a terminal (it holds a key: don't share it):</p>
+                    <pre class="setup__code" data-connect-command />
+                    <p>
+                      <button type="button" class="setup__button" data-connect-copy>
+                        Copy
+                      </button>
+                    </p>
+                    <p class="setup__hint">
+                      Then start Claude Code and try “what's in the newsletter inbox?” or “start the next edition”.
+                    </p>
+                  </div>
+                </>
+              ) : (
+                <p class="setup__hint">
+                  An Admin can make the connection here, or run <code>npm run connect-claude</code> on the server.
+                </p>
+              )
+            }
+            {configured && (
+              <p>
+                <a href="/newsletter/edit">Go to the drafts →</a>
+              </p>
+            )}
+          </fieldset>
+        </form>
+      ) : (
+        <p class="prose">
+          You're signed in as {user.email}, which can't change the newsletter's settings. That's for Editors and Admins;
+          ask an Admin to change your role in <a href="/_emdash/admin">the admin</a>.
+        </p>
+      )
+    }
+  </section>
+</Newsletter>
+
+<script>
+  import { startSetup } from "../../scripts/setup.ts";
+  const root = document.querySelector<HTMLFormElement>("[data-setup]");
+  if (root) startSetup(root);
+</script>
+
+<style>
+  .setup {
+    max-width: 46rem;
+    padding-block: clamp(2rem, 6vh, 3.5rem) 4rem;
+  }
+
+  .setup__title {
+    font-size: clamp(2rem, 5vw, 2.8rem);
+    margin-bottom: 1rem;
+  }
+
+  .setup__intro {
+    margin-bottom: 1.5rem;
+  }
+
+  fieldset {
+    border: 0;
+    border-top: 1px solid var(--rule);
+    margin: 0;
+    padding: 1.5rem 0 2rem;
+    display: grid;
+    gap: 1rem;
+  }
+
+  legend {
+    font-family: var(--font-display);
+    font-weight: 650;
+    font-size: 1.2rem;
+    padding: 0 0 0.75rem;
+  }
+
+  .setup__step {
+    display: inline-grid;
+    place-items: center;
+    width: 1.6rem;
+    height: 1.6rem;
+    margin-right: 0.4rem;
+    border-radius: 50%;
+    background: var(--blue);
+    color: #fff;
+    font-size: 0.85rem;
+  }
+
+  label {
+    display: grid;
+    gap: 0.3rem;
+    font-weight: 550;
+  }
+
+  input:not([type="radio"], [type="file"]),
+  select,
+  textarea {
+    font: inherit;
+    font-weight: 400;
+    color: var(--ink);
+    background: color-mix(in oklab, var(--stone) 60%, white);
+    border: 1px solid var(--rule-strong);
+    border-radius: 6px;
+    padding: 0.5rem 0.65rem;
+    width: 100%;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    input:not([type="radio"], [type="file"]),
+    select,
+    textarea {
+      background: var(--stone-sunk);
+    }
+  }
+
+  .setup__mono {
+    font-family: ui-monospace, Menlo, monospace;
+    font-size: 0.9rem;
+  }
+
+  .setup__row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+    gap: 1rem;
+  }
+
+  .setup__hint {
+    font-weight: 400;
+    font-size: 0.9rem;
+    color: var(--ink-soft);
+  }
+
+  .setup__more summary {
+    cursor: pointer;
+    color: var(--ink-soft);
+  }
+
+  .setup__more label {
+    margin-top: 0.75rem;
+  }
+
+  .setup__logo {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 1rem;
+  }
+
+  .setup__logo img {
+    height: 48px;
+    width: auto;
+  }
+
+  .setup__swatches {
+    display: flex;
+    gap: 0.4rem;
+  }
+
+  .setup__swatches span {
+    width: 1.6rem;
+    height: 1.6rem;
+    border-radius: 4px;
+    border: 1px solid var(--rule);
+  }
+
+  .setup__preview {
+    width: 100%;
+    height: 32rem;
+    border: 1px solid var(--rule);
+    border-radius: 8px;
+    background: #fff;
+  }
+
+  .setup__problems {
+    margin: 0;
+    padding-left: 1.2rem;
+    font-size: 0.9rem;
+  }
+
+  .setup__problems li[data-kind="error"] {
+    color: #b3261e;
+  }
+
+  .setup__problems li[data-kind="warning"] {
+    color: var(--ink-soft);
+  }
+
+  .setup__choice {
+    grid-template-columns: auto 1fr;
+    align-items: start;
+    gap: 0.6rem;
+    font-weight: 400;
+  }
+
+  .setup__choice input {
+    margin-top: 0.35rem;
+  }
+
+  .setup__bucket[hidden] {
+    display: none;
+  }
+
+  .setup__code {
+    font-family: ui-monospace, Menlo, monospace;
+    font-size: 0.85rem;
+    background: var(--stone-sunk);
+    border-radius: 6px;
+    padding: 0.75rem 1rem;
+    overflow-x: auto;
+    white-space: pre;
+    margin: 0;
+  }
+
+  .setup__ok {
+    color: var(--green-ink);
+  }
+
+  .setup__warning {
+    font-size: 0.9rem;
+    color: #8a5300;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    .setup__warning {
+      color: #f0b45a;
+    }
+  }
+
+  .setup__warning[hidden] {
+    display: none;
+  }
+
+  .setup__actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 1rem;
+    margin: 0 0 2rem;
+  }
+
+  .setup__save,
+  .setup__button {
+    font: inherit;
+    font-weight: 600;
+    border-radius: 6px;
+    padding: 0.55rem 1rem;
+    cursor: pointer;
+  }
+
+  .setup__save {
+    border: 0;
+    background: var(--blue);
+    color: #fff;
+  }
+
+  .setup__button {
+    display: inline-block;
+    border: 1px solid var(--rule-strong);
+    background: transparent;
+    color: var(--ink);
+  }
+
+  .setup__save:disabled {
+    opacity: 0.6;
+    cursor: progress;
+  }
+
+  .setup__status {
+    color: var(--ink-soft);
+  }
+
+  [data-connect][hidden] {
+    display: none;
+  }
+</style>
