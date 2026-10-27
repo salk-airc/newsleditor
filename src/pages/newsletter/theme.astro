@@ -60,11 +60,13 @@ const colors = [
                 <img data-logo-img alt="" hidden />
                 <span data-logo-none>No logo</span>
                 <label class="theme__button">
-                  Upload… <input type="file" accept="image/png,image/jpeg,image/svg+xml,image/gif" data-logo-file hidden />
+                  Upload… <input type="file" accept="image/png,image/jpeg,image/gif" data-logo-file hidden />
                 </label>
                 <button type="button" class="theme__button" data-logo-clear>Remove</button>
               </div>
-              <p class="theme__hint">A transparent PNG works best; it's shown 40px tall.</p>
+              <p class="theme__hint">
+                A transparent PNG works best; it's shown 40px tall. Not SVG: Gmail and Outlook don't show SVG images.
+              </p>
               <label>
                 Wordmark <input name="wordmark" maxlength="24" />
               </label>

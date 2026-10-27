@@ -190,6 +190,8 @@ export function checkTheme(theme: Theme): ThemeCheck {
   // opened the email.
   if (theme.logo && !/^\/(?!\/)/.test(theme.logo))
     errors.push("The logo must be an image on this site: upload it (a path like /_emdash/api/media/file/...), not a link to another site.");
+  if (theme.logo && /\.svg(\?|$)/i.test(theme.logo))
+    warnings.push("The logo is an SVG, which Gmail and Outlook don't show: it will be missing in most inboxes. Upload a PNG instead.");
   return { errors, warnings };
 }
 

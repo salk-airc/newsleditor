@@ -1,7 +1,8 @@
 import { renderDesignedEmail } from "../plugins/newsletter/email-designed.ts";
 import { DEFAULT_SETTINGS, type Settings } from "../plugins/newsletter/settings.ts";
-import { checkTheme, DEFAULT_THEME, type Theme, type ThemeCheck } from "../plugins/newsletter/theme.ts";
+import { checkTheme, DEFAULT_THEME, type Theme, type ThemeCheck, type ThemePatch } from "../plugins/newsletter/theme.ts";
 import { plugin, uploadImage } from "./emdash-api.ts";
+import { previewFrame } from "./preview-frame.ts";
 
 // The Theme page (src/pages/newsletter/theme.astro): a form over the
 // newsletter's theme and a live preview of a sample edition in it. Checks run
@@ -55,6 +56,13 @@ export function startThemeEditor(root: HTMLElement) {
   let saved: Theme = DEFAULT_THEME;
   let theme: Theme = DEFAULT_THEME;
   let settings: Settings = DEFAULT_SETTINGS;
+  // The form stays locked until the saved theme has loaded: typing earlier
+  // would be wiped when it arrives, and saving without it would write the
+  // defaults over the real theme.
+  let loaded = false;
+  const fieldsets = form.querySelectorAll("fieldset");
+  fieldsets.forEach((f) => (f.disabled = true));
+  const show = previewFrame(preview);
 
   // ---------------------------------------------------------- form <-> theme
 
@@ -105,10 +113,29 @@ export function startThemeEditor(root: HTMLElement) {
       ? { errors: bad.map((k) => `${k}: “${theme.colors[k]}” isn't a 6-digit hex colour like #3557a0.`), warnings: [] }
       : checkTheme(theme);
     showProblems(check);
-    const changed = JSON.stringify(theme) !== JSON.stringify(saved);
-    save.disabled = !changed || check.errors.length > 0;
+    const changed = Object.keys(changes()).length > 0;
+    save.disabled = !loaded || !changed || check.errors.length > 0;
     if (changed) status.textContent = "Not saved yet";
+    else if (status.textContent === "Not saved yet") status.textContent = "";
     if (!bad.length) render();
+  }
+
+  // Only the fields that differ from the saved theme, so saving doesn't undo
+  // a change made meanwhile elsewhere (Claude, another editor) to fields
+  // nobody touched here.
+  function changes(): ThemePatch {
+    const patch: Record<string, unknown> = {};
+    for (const key of Object.keys(theme) as (keyof Theme)[]) {
+      if (key === "colors" || key === "banner") {
+        // Colours compare without case: the form shows them in lower case.
+        const was = saved[key] as Record<string, unknown>;
+        const part = Object.fromEntries(
+          Object.entries(theme[key]).filter(([k, v]) => String(v).toLowerCase() !== String(was[k]).toLowerCase()),
+        );
+        if (Object.keys(part).length) patch[key] = part;
+      } else if (theme[key] !== saved[key]) patch[key] = theme[key];
+    }
+    return patch as ThemePatch;
   }
 
   function showProblems({ errors, warnings }: ThemeCheck) {
@@ -128,9 +155,7 @@ export function startThemeEditor(root: HTMLElement) {
     // inverted frame.
     if (dark.checked) html = html.replace("</head>", "<style>img{filter:invert(1) hue-rotate(180deg)}</style></head>");
     preview.classList.toggle("is-dark", dark.checked);
-    const y = preview.contentWindow?.scrollY ?? 0;
-    preview.addEventListener("load", () => preview.contentWindow?.scrollTo(0, y), { once: true });
-    preview.srcdoc = html;
+    show(html);
   }
 
   // -------------------------------------------------------------- events --
@@ -178,11 +203,16 @@ export function startThemeEditor(root: HTMLElement) {
     save.disabled = true;
     status.textContent = "Saving…";
     try {
-      const result = await plugin<{ saved: boolean; theme: Theme; check: ThemeCheck }>("theme-update", { patch: read() });
+      const result = await plugin<{ saved: boolean; theme: Theme; check: ThemeCheck }>("theme-update", {
+        patch: changes(),
+      });
       showProblems(result.check);
       if (result.saved) {
+        // The theme as stored, including changes made elsewhere meanwhile.
         saved = theme = result.theme;
-        status.textContent = "Saved. Drafts use it from their next preview.";
+        fill(theme);
+        render();
+        status.textContent = "Saved. Drafts opened from now on use it; reload any that are open.";
       } else {
         status.textContent = "Not saved: fix the problems above.";
         save.disabled = false;
@@ -208,11 +238,15 @@ export function startThemeEditor(root: HTMLElement) {
   plugin<{ theme: Theme; updatedBy: string | null; updatedAt: string | null }>("theme-get", {})
     .then((r) => {
       saved = theme = r.theme;
+      loaded = true;
+      fieldsets.forEach((f) => (f.disabled = false));
       fill(theme);
       update();
       status.textContent = r.updatedAt
         ? `Last changed ${new Date(r.updatedAt).toLocaleString()}${r.updatedBy ? ` by ${r.updatedBy}` : ""}`
         : "";
     })
-    .catch((err) => (status.textContent = `Couldn't load the saved theme: ${(err as Error).message}`));
+    .catch(
+      (err) => (status.textContent = `Couldn't load the saved theme, so it can't be changed here: ${(err as Error).message}. Reload to try again.`),
+    );
 }
