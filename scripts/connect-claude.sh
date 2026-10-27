@@ -52,9 +52,14 @@ fi
 echo "2/4 Approving the newsletter plugin's MCP tools"
 admin_call PUT /admin/plugins/newsletter/mcp '{"enabled":true}' | json data.enabled >/dev/null
 
-echo "3/4 Making a token for Claude"
+# One token per Admin from this script: the one it made before is revoked,
+# so they don't pile up. (The Settings page does the same with its own.)
+echo "3/4 Making a token for Claude (replacing the one this script made before)"
+TOKEN_NAME="Claude Code (terminal)"
+OLD=$(admin_call GET /admin/api-tokens | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{for(const t of JSON.parse(s).data.items)if(t.name===process.argv[1])console.log(t.id)})' "$TOKEN_NAME")
+for id in $OLD; do admin_call DELETE "/admin/api-tokens/$id" >/dev/null; done
 TOKEN=$(admin_call POST /admin/api-tokens \
-  '{"name":"claude-code","scopes":["content:read","content:write","media:read","media:write","mcp:tools:newsletter"]}' | json data.token)
+  "{\"name\":\"$TOKEN_NAME\",\"scopes\":[\"content:read\",\"content:write\",\"media:read\",\"media:write\",\"mcp:tools:newsletter\"]}" | json data.token)
 
 echo "4/4 Adding '$SERVER' to Claude Code"
 claude mcp remove "$SERVER" --scope user >/dev/null 2>&1 || true

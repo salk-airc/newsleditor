@@ -7,7 +7,7 @@
   "license": "MIT",
   "repository": "github:salk-airc/newsleditor",
   "engines": {
-    "node": ">=22"
+    "node": ">=22.18"
   },
   "scripts": {
     "start": "node scripts/start.mjs",
