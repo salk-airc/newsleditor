@@ -2,6 +2,7 @@ import type { Settings, SettingsPatch } from "../plugins/newsletter/settings.ts"
 import { checkTheme, DEFAULT_THEME, type Theme, type ThemeCheck } from "../plugins/newsletter/theme.ts";
 import { plugin, uploadImage } from "./emdash-api.ts";
 import { logoColors, themeFromColors } from "./logo-colors.ts";
+import { previewFrame } from "./preview-frame.ts";
 import { sampleEmail } from "./theme-editor.ts";
 
 // The setup and Settings page (src/pages/newsletter/setup.astro): fills the
@@ -13,7 +14,7 @@ import { sampleEmail } from "./theme-editor.ts";
 export function startSetup(form: HTMLFormElement) {
   const $ = <T extends Element>(sel: string) => form.querySelector<T>(sel)!;
   const field = (name: string) => form.elements.namedItem(name) as HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement;
-  const preview = $<HTMLIFrameElement>("[data-preview]");
+  const show = previewFrame($<HTMLIFrameElement>("[data-preview]"));
   const problems = $<HTMLUListElement>("[data-problems]");
   const status = $<HTMLElement>("[data-status]");
   const save = $<HTMLButtonElement>("[data-save]");
@@ -70,9 +71,7 @@ export function startSetup(form: HTMLFormElement) {
     const draft = { ...settings, ...read(), sender: settings.sender } as Settings;
     const t = currentTheme();
     showProblems(checkTheme(t));
-    const y = preview.contentWindow?.scrollY ?? 0;
-    preview.addEventListener("load", () => preview.contentWindow?.scrollTo(0, y), { once: true });
-    preview.srcdoc = sampleEmail(t, draft);
+    show(sampleEmail(t, draft));
   }
 
   function showProblems({ errors, warnings }: ThemeCheck, extra: string[] = []) {
