@@ -23,7 +23,8 @@ export function startSetup(form: HTMLFormElement) {
   const bucket = $<HTMLElement>("[data-bucket]");
 
   const settings = JSON.parse(form.dataset.settings!) as Settings;
-  const configured = !!form.dataset.configured;
+  // Becomes true with the first save, on this page load too.
+  let configured = !!form.dataset.configured;
   let theme: Theme = DEFAULT_THEME;
   /** True once the theme here differs from the saved one (a logo was uploaded). */
   let themeChanged = false;
@@ -102,10 +103,21 @@ export function startSetup(form: HTMLFormElement) {
     const file = input.files?.[0];
     input.value = "";
     if (!file) return;
+    // The colours first, from the file itself: an image the browser can't
+    // read isn't worth uploading.
+    let colors: string[];
+    const local = URL.createObjectURL(file);
+    try {
+      colors = await logoColors(local);
+    } catch {
+      status.textContent = "Couldn't read that image. Try a PNG.";
+      return;
+    } finally {
+      URL.revokeObjectURL(local);
+    }
     status.textContent = "Uploading logo…";
     try {
       const logo = await uploadImage(file, "logo");
-      const colors = await logoColors(URL.createObjectURL(file));
       theme = { ...themeFromColors(colors, theme), logo };
       themeChanged = true;
       logoImg.src = logo;
@@ -155,6 +167,7 @@ export function startSetup(form: HTMLFormElement) {
       status.textContent = "Saved.";
       $<HTMLElement>("[data-connect]").hidden = false;
       if (!configured) $<HTMLElement>("[data-connect]").scrollIntoView({ behavior: "smooth", block: "start" });
+      configured = true;
     } catch (err) {
       status.textContent = `Not saved: ${(err as Error).message}`;
     } finally {
@@ -178,11 +191,23 @@ export function startSetup(form: HTMLFormElement) {
       const command =
         `claude mcp add --transport http --scope user newsletter ${form.dataset.mcpUrl} ` +
         `--header "Authorization: Bearer ${token.token}"`;
-      $<HTMLElement>("[data-connect-command]").textContent = command;
+      const shown = $<HTMLElement>("[data-connect-command]");
+      shown.textContent = command;
       $<HTMLElement>("[data-connect-done]").hidden = false;
-      $<HTMLButtonElement>("[data-connect-copy]").onclick = async (e) => {
-        await navigator.clipboard.writeText(command);
-        (e.target as HTMLButtonElement).textContent = "Copied";
+      const copy = $<HTMLButtonElement>("[data-connect-copy]");
+      copy.onclick = async () => {
+        try {
+          await navigator.clipboard.writeText(command);
+          copy.textContent = "Copied";
+        } catch {
+          // No clipboard permission (some embedded browsers): select the
+          // command, try the old copy command, and else leave it selected.
+          const range = document.createRange();
+          range.selectNodeContents(shown);
+          getSelection()?.removeAllRanges();
+          getSelection()?.addRange(range);
+          copy.textContent = document.execCommand("copy") ? "Copied" : "Selected: press Ctrl+C (⌘C on a Mac)";
+        }
       };
     } catch (err) {
       status.textContent = `Couldn't make the connection: ${(err as Error).message}`;
