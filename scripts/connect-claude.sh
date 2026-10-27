@@ -67,5 +67,5 @@ Done. Start a new Claude Code session and try:
   "what's in the newsletter inbox?"
   "start the next edition of the newsletter"
 
-Updated newsletteditor? Run this again to re-approve the tools.
+Updated newsleditor? Run this again to re-approve the tools.
 EOF
