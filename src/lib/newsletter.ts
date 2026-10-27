@@ -1,6 +1,7 @@
 import { Role, type User } from "@emdash-cms/auth";
 import { getEmDashCollection, PluginStorageRepository } from "emdash";
 import { getDb } from "emdash/runtime";
+import { wordCount } from "../plugins/newsletter/checks.ts";
 import { formatDate } from "../plugins/newsletter/editions.ts";
 import { applySettingsPatch, DEFAULT_SETTINGS, type Settings } from "../plugins/newsletter/settings.ts";
 import { applyPatch, DEFAULT_THEME, type Theme } from "../plugins/newsletter/theme.ts";
@@ -46,8 +47,14 @@ export function canEdit(user: User | undefined): boolean {
 
 /** Published editions, newest first. With status "draft", the never-published ones instead. */
 export async function getEditions(status: "published" | "draft" = "published"): Promise<Edition[]> {
-  const { entries, error } = await getEmDashCollection("editions", { status, limit: 500 });
-  if (error) throw error;
+  const entries = [];
+  let cursor: string | undefined;
+  do {
+    const page = await getEmDashCollection("editions", { status, limit: 200, cursor });
+    if (page.error) throw page.error;
+    entries.push(...page.entries);
+    cursor = page.nextCursor;
+  } while (cursor);
   return entries
     .map(({ id, data }) => {
       const d = data as EditionData;
@@ -87,12 +94,7 @@ export async function getTheme(): Promise<Theme> {
 }
 
 export function readingMinutes(markdown: string): number {
-  const words = markdown
-    .replace(/!\[[^\]]*\]\([^)]*\)/g, "")
-    .replace(/\]\([^)]*\)/g, "]")
-    .split(/\s+/)
-    .filter((w) => /\w/.test(w)).length;
-  return Math.max(1, Math.round(words / 230));
+  return Math.max(1, Math.round(wordCount(markdown) / 230));
 }
 
 /** The edition's sections, in order. The first one is its lead story. */

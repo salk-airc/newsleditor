@@ -1,6 +1,6 @@
-/* An edition's text, as /newsletter/<date> shows it. Shared by that page and
-   the editor's Archive page preview (src/scripts/edition-editor.ts), so the
-   preview can't drift from the real page. Everything sits under .issue__body. */
+/* An edition's text, as /newsletter/<date> shows it. Kept in its own file so
+   anything else that shows an edition the archive's way uses the same rules.
+   Everything sits under .issue__body. */
 
 .issue__body {
   font-size: 1.0625rem;

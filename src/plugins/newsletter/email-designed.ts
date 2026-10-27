@@ -255,7 +255,8 @@ function masthead(s: Style, options: RenderDesignedEmailOptions, sections: strin
     : "";
 
   return (
-    // Under the banner the lockup sits a little into the glow.
+    // Under the banner the lockup sits a little into the glow. Gmail drops
+    // negative margins; there it just sits under the glow instead.
     `<table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin:${underBanner ? "-28px" : "0"} 0 0"><tr>` +
     `<td style="vertical-align:middle">${lockup}</td>` +
     `<td style="vertical-align:middle; text-align:right; ${s.font}; font-size:13px; font-weight:500; color:${s.muted}; white-space:nowrap">${escapeHtml(date)}</td>` +
