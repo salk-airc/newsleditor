@@ -6,7 +6,8 @@ import { canEdit, getSettings } from "./lib/newsletter";
 // - /newsletter and everything under it: anyone signed in to EmDash. The
 //   studio, the Theme page and setup also need the Editor role, checked by
 //   their own pages (canEdit).
-// - Until setup has run, editors are sent to /newsletter/setup.
+// - Until setup has run, editors are sent to /newsletter/setup (the Theme
+//   page stays open: setup links to it).
 // - /newsletter/edit/<slug>/sync: the co-editing rooms' login check, which
 //   answers 401 itself rather than redirecting.
 // - / goes to the newsletter.
@@ -18,6 +19,15 @@ const SEARCH = /^\/_emdash\/api\/search(\/|$)/;
 const LOGIN = "/_emdash/admin/login";
 // The same pattern src/rooms/server.ts takes; the route checks sign-in itself.
 const SYNC = /^\/newsletter\/edit\/[a-z0-9-]{1,100}\/sync$/;
+const BEFORE_SETUP = new Set(["/newsletter/setup", "/newsletter/theme"]);
+
+// Setup is never undone, so once it has run there's no need to ask the
+// database again on every request.
+let setUp = false;
+async function setupDone(): Promise<boolean> {
+  setUp ||= (await getSettings()).configured;
+  return setUp;
+}
 
 export const onRequest = defineMiddleware(async (context, next) => {
   const { pathname, search } = context.url;
@@ -31,7 +41,7 @@ export const onRequest = defineMiddleware(async (context, next) => {
   const user = context.locals.user;
   if (!user) return context.redirect(`${LOGIN}?redirect=${encodeURIComponent(pathname + search)}`);
 
-  if (canEdit(user) && pathname !== "/newsletter/setup" && !(await getSettings()).configured) {
+  if (canEdit(user) && !BEFORE_SETUP.has(pathname) && !(await setupDone())) {
     return context.redirect("/newsletter/setup");
   }
 

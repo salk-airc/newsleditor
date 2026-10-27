@@ -1,5 +1,5 @@
 import type { Settings, SettingsPatch } from "../plugins/newsletter/settings.ts";
-import { checkTheme, DEFAULT_THEME, type Theme, type ThemeCheck } from "../plugins/newsletter/theme.ts";
+import { checkTheme, DEFAULT_THEME, type Theme, type ThemeCheck, themeChanges } from "../plugins/newsletter/theme.ts";
 import { plugin, uploadImage } from "./emdash-api.ts";
 import { logoColors, themeFromColors } from "./logo-colors.ts";
 import { previewFrame } from "./preview-frame.ts";
@@ -21,13 +21,17 @@ export function startSetup(form: HTMLFormElement) {
   const logoImg = $<HTMLImageElement>("[data-logo-img]");
   const swatches = $<HTMLElement>("[data-swatches]");
   const bucket = $<HTMLElement>("[data-bucket]");
+  const storageNote = $<HTMLElement>("[data-storage-note]");
 
+  /** The settings as last saved. */
   const settings = JSON.parse(form.dataset.settings!) as Settings;
   // Becomes true with the first save, on this page load too.
   let configured = !!form.dataset.configured;
+  /** The theme as last saved: null until it has loaded. Save waits for it, so a failed load can't save defaults over it. */
+  let savedTheme: Theme | null = null;
+  /** The theme being worked on here (a logo changes it). */
   let theme: Theme = DEFAULT_THEME;
-  /** True once the theme here differs from the saved one (a logo was uploaded). */
-  let themeChanged = false;
+  save.disabled = true;
 
   // ------------------------------------------------------------ the form --
 
@@ -91,10 +95,25 @@ export function startSetup(form: HTMLFormElement) {
   let timer: ReturnType<typeof setTimeout> | undefined;
   form.addEventListener("input", (e) => {
     const target = e.target as HTMLInputElement;
-    if (target.name === "images") bucket.hidden = target.value !== "bucket";
+    if (target.name === "images") {
+      bucket.hidden = target.value !== "bucket";
+      showStorage();
+    }
     clearTimeout(timer);
     timer = setTimeout(render, 150);
   });
+
+  // The choice is a note for people; where images really go is set by the
+  // server's environment (S3_*). Say so when the two disagree.
+  function showStorage() {
+    const chosen = form.querySelector<HTMLInputElement>('input[name="images"]:checked')?.value;
+    const actual = form.dataset.storage;
+    storageNote.hidden = !chosen || chosen === actual;
+    storageNote.textContent =
+      actual === "bucket"
+        ? "This server stores images in a bucket (S3_BUCKET is set), whatever is chosen here."
+        : "This server still stores images on this computer: set the variables below and restart it to use a bucket.";
+  }
 
   // ---------------------------------------------------------------- logo --
 
@@ -119,7 +138,6 @@ export function startSetup(form: HTMLFormElement) {
     try {
       const logo = await uploadImage(file, "logo");
       theme = { ...themeFromColors(colors, theme), logo };
-      themeChanged = true;
       logoImg.src = logo;
       logoImg.hidden = false;
       swatches.replaceChildren(
@@ -146,24 +164,32 @@ export function startSetup(form: HTMLFormElement) {
     save.disabled = true;
     status.textContent = "Saving…";
     try {
-      const t = currentTheme();
-      if (themeChanged || !configured || t.nameLead !== theme.nameLead) {
-        const result = await plugin<{ saved: boolean; check: ThemeCheck }>("theme-update", { patch: t });
+      if (!savedTheme) throw new Error("the saved theme hasn't loaded");
+      // Only what changed here, theme and settings alike, so saving doesn't
+      // undo changes made meanwhile on the Theme page or by Claude.
+      const themePatch = themeChanges(savedTheme, currentTheme());
+      if (Object.keys(themePatch).length) {
+        const result = await plugin<{ saved: boolean; theme: Theme; check: ThemeCheck }>("theme-update", {
+          patch: themePatch,
+        });
         if (!result.saved) {
           showProblems(result.check);
           throw new Error("the theme would be hard to read; see the problems above the preview");
         }
-        theme = t;
-        themeChanged = false;
+        savedTheme = theme = result.theme;
       }
-      const result = await plugin<{ saved: boolean; errors: string[]; settings: Settings }>("settings-update", {
-        patch: read(),
-      });
-      if (!result.saved) {
-        showProblems(checkTheme(currentTheme()), result.errors);
-        throw new Error(result.errors[0] ?? "check the settings");
+      const settingsPatch = settingsChanges(settings, read());
+      // The first save always writes the settings: that's what marks setup done.
+      if (Object.keys(settingsPatch).length || !configured) {
+        const result = await plugin<{ saved: boolean; errors: string[]; settings: Settings }>("settings-update", {
+          patch: settingsPatch,
+        });
+        if (!result.saved) {
+          showProblems(checkTheme(currentTheme()), result.errors);
+          throw new Error(result.errors[0] ?? "check the settings");
+        }
+        Object.assign(settings, result.settings);
       }
-      Object.assign(settings, result.settings);
       status.textContent = "Saved.";
       $<HTMLElement>("[data-connect]").hidden = false;
       if (!configured) $<HTMLElement>("[data-connect]").scrollIntoView({ behavior: "smooth", block: "start" });
@@ -171,7 +197,7 @@ export function startSetup(form: HTMLFormElement) {
     } catch (err) {
       status.textContent = `Not saved: ${(err as Error).message}`;
     } finally {
-      save.disabled = false;
+      save.disabled = !savedTheme;
     }
   });
 
@@ -184,8 +210,14 @@ export function startSetup(form: HTMLFormElement) {
       // Approval covers the tools' exact definitions, so after an update that
       // changes them they hide until this runs again.
       await admin("PUT", "/admin/plugins/newsletter/mcp", { enabled: true });
+      // One connection per Admin: the token this button made before is
+      // revoked, so they don't pile up. EmDash's scopes aren't per
+      // collection, so the token reaches all content and media; the page
+      // says so.
+      const { items } = await admin<{ items: { id: string; name: string }[] }>("GET", "/admin/api-tokens");
+      for (const old of items.filter((t) => t.name === TOKEN_NAME)) await admin("DELETE", `/admin/api-tokens/${old.id}`);
       const token = await admin<{ token: string }>("POST", "/admin/api-tokens", {
-        name: `claude-code-${new Date().toISOString().slice(0, 10)}`,
+        name: TOKEN_NAME,
         scopes: ["content:read", "content:write", "media:read", "media:write", "mcp:tools:newsletter"],
       });
       const command =
@@ -218,25 +250,42 @@ export function startSetup(form: HTMLFormElement) {
   // ---------------------------------------------------------------- start --
 
   fill(settings);
+  showStorage();
   plugin<{ theme: Theme }>("theme-get", {})
     .then((r) => {
-      theme = r.theme;
+      savedTheme = theme = r.theme;
+      save.disabled = false;
       if (theme.logo) {
         logoImg.src = theme.logo;
         logoImg.hidden = false;
       }
       render();
     })
-    .catch(() => render());
+    .catch((err) => {
+      status.textContent = `Couldn't load the saved theme, so nothing can be saved: ${(err as Error).message}. Reload to try again.`;
+      render();
+    });
 }
 
+/** The settings fields that differ from the saved ones. */
+function settingsChanges(saved: Settings, next: SettingsPatch): SettingsPatch {
+  const patch: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(next)) {
+    if (JSON.stringify(value) !== JSON.stringify(saved[key as keyof Settings])) patch[key] = value;
+  }
+  return patch as SettingsPatch;
+}
+
+/** The name of the API token "Connect Claude" makes, so it can find and replace it. */
+const TOKEN_NAME = "Claude Code (Settings page)";
+
 /** An EmDash admin API call as the signed-in Admin. */
-async function admin<T = unknown>(method: string, path: string, body: unknown): Promise<T> {
+async function admin<T = unknown>(method: string, path: string, body?: unknown): Promise<T> {
   const res = await fetch(`/_emdash/api${path}`, {
     method,
     credentials: "same-origin",
     headers: { "content-type": "application/json", "x-emdash-request": "1" },
-    body: JSON.stringify(body),
+    body: body === undefined ? undefined : JSON.stringify(body),
   });
   const json = await res.json().catch(() => null);
   if (!res.ok) throw new Error(json?.error?.message ?? `HTTP ${res.status}`);

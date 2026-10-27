@@ -40,6 +40,7 @@ const days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", 
           data-configured={configured ? "1" : ""}
           data-admin={admin ? "1" : ""}
           data-mcp-url={mcpUrl}
+          data-storage={storage}
         >
           {!configured && (
             <p class="setup__intro prose">
@@ -161,6 +162,7 @@ const days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", 
                 address, so every reader's mail app can load them.
               </span>
             </label>
+            <p class="setup__warning" data-storage-note role="status" hidden />
             <div class="setup__bucket" data-bucket hidden>
               {
                 storage === "bucket" ? (
@@ -196,7 +198,9 @@ S3_PUBLIC_URL=https://media.example.org`}
             </legend>
             <p class="setup__hint">
               Claude Code can then add things to the newsletter's inbox, start an edition in your voice, and change the
-              theme, through this site's MCP server.
+              theme, through this site's MCP server. Its key can read and change all of this site's content and media, as
+              you can. Making a new connection here replaces the one made before, so other computers using that one
+              need the new command too.
             </p>
             {
               admin ? (
@@ -418,6 +422,21 @@ S3_PUBLIC_URL=https://media.example.org`}
 
   .setup__ok {
     color: var(--green-ink);
+  }
+
+  .setup__warning {
+    font-size: 0.9rem;
+    color: #8a5300;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    .setup__warning {
+      color: #f0b45a;
+    }
+  }
+
+  .setup__warning[hidden] {
+    display: none;
   }
 
   .setup__actions {
