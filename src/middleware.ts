@@ -1,9 +1,12 @@
 import { defineMiddleware } from "astro:middleware";
+import { canEdit, getSettings } from "./lib/newsletter";
 
 // Who can see what:
 //
 // - /newsletter and everything under it: anyone signed in to EmDash. The
-//   studio also needs the Editor role, checked by its own pages (canEdit).
+//   studio, the Theme page and setup also need the Editor role, checked by
+//   their own pages (canEdit).
+// - Until setup has run, editors are sent to /newsletter/setup.
 // - /newsletter/edit/<slug>/sync: the co-editing rooms' login check, which
 //   answers 401 itself rather than redirecting.
 // - / goes to the newsletter.
@@ -27,6 +30,10 @@ export const onRequest = defineMiddleware(async (context, next) => {
 
   const user = context.locals.user;
   if (!user) return context.redirect(`${LOGIN}?redirect=${encodeURIComponent(pathname + search)}`);
+
+  if (canEdit(user) && pathname !== "/newsletter/setup" && !(await getSettings()).configured) {
+    return context.redirect("/newsletter/setup");
+  }
 
   const response = await next();
   // Pages for signed-in people only: never from a shared cache.
