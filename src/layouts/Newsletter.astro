@@ -2,8 +2,8 @@
 import Base from "./Base.astro";
 import { canEdit, getSettings } from "../lib/newsletter";
 
-// Shell for every newsletter page: a header with the newsletter's name and,
-// for editors, links to the drafts, the theme and the settings.
+// Shell for every newsletter page: a header with the newsletter's name and
+// links to its pages, some for editors only.
 
 interface Props {
   title: string;
@@ -17,8 +17,6 @@ const path = Astro.url.pathname.replace(/\/$/, "");
 const links = [
   { href: "/newsletter", label: "Archive", show: true },
   { href: "/newsletter/edit", label: "Drafts", show: editor },
-  { href: "/newsletter/theme", label: "Theme", show: editor },
-  { href: "/newsletter/setup", label: "Settings", show: editor },
 ].filter((link) => link.show);
 ---
 
