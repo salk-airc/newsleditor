@@ -39,7 +39,7 @@ const storage = process.env.S3_BUCKET
 /** @returns {import("vite").Plugin} */
 function restartOnPluginChange() {
   return {
-    name: "newsletteditor:restart-on-plugin-change",
+    name: "newsleditor:restart-on-plugin-change",
     apply: "serve",
     handleHotUpdate({ file, server }) {
       if (file.startsWith(pluginsDir)) {
@@ -56,7 +56,7 @@ function restartOnPluginChange() {
 /** @returns {import("vite").Plugin} */
 function editionRooms() {
   return {
-    name: "newsletteditor:edition-rooms",
+    name: "newsleditor:edition-rooms",
     apply: "serve",
     configureServer(server) {
       const rooms = createRooms({

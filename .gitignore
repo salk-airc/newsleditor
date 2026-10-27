@@ -1,6 +1,9 @@
 # build output
 dist/
 .astro/
+# EmDash rewrites this on every build and dev start, with this machine's
+# database path in it.
+.emdash/migrations.json
 
 # dependencies
 node_modules/
