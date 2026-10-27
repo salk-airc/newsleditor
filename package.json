@@ -1,11 +1,11 @@
 {
-  "name": "newsletteditor",
+  "name": "newsleditor",
   "type": "module",
   "version": "0.1.0",
   "private": true,
   "description": "A self-hosted studio for writing an email newsletter together: live co-editing, Outlook- and Slack-ready output, and Claude over MCP.",
   "license": "MIT",
-  "repository": "github:salk-airc/newsletteditor",
+  "repository": "github:salk-airc/newsleditor",
   "engines": {
     "node": ">=22"
   },

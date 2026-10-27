@@ -1,7 +1,7 @@
 {
   "version": "1",
   "meta": {
-    "name": "newsletteditor",
+    "name": "newsleditor",
     "description": "A newsletter studio: one collection of editions, written in markdown."
   },
   "collections": [

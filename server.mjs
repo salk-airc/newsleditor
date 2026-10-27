@@ -30,7 +30,7 @@ server.on("upgrade", (req, socket, head) => {
 
 server.listen(port, host, () => {
   const shown = host === "0.0.0.0" || host === "::" ? "localhost" : host;
-  console.log(`newsletteditor is running at http://${shown}:${port}/`);
+  console.log(`newsleditor is running at http://${shown}:${port}/`);
 });
 
 // How this process reaches itself: the host it listens on, unless that's

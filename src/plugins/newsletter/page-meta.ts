@@ -23,7 +23,7 @@ export async function fetchPageMeta(http: Http | undefined, url: string): Promis
   try {
     const res = await http.fetch(url, {
       headers: {
-        "user-agent": "newsletteditor/0.1 (+https://github.com/salk-airc/newsletteditor)",
+        "user-agent": "newsleditor/0.1 (+https://github.com/salk-airc/newsleditor)",
         accept: "text/html,application/xhtml+xml",
       },
       signal: AbortSignal.timeout(TIMEOUT_MS),

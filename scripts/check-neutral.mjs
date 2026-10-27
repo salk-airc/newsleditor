@@ -1,4 +1,4 @@
-// npm run check:neutral: newsletteditor ships with no organization's names
+// npm run check:neutral: newsleditor ships with no organization's names
 // or branding. It started as one organization's newsletter studio; this
 // keeps that organization's names from creeping back in.
 
