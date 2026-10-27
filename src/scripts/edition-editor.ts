@@ -370,7 +370,10 @@ export async function startEditor(root: HTMLElement): Promise<void> {
       editor.focus();
     }),
   );
-  widthInput.addEventListener("input", () => writeImage({ width: Number(widthInput.value) }));
+  // The label follows the slider as it moves; the edit (synced to everyone,
+  // and restarting the save timer) happens once, when it's let go.
+  widthInput.addEventListener("input", () => (widthOut.value = `${widthInput.value}px`));
+  widthInput.addEventListener("change", () => writeImage({ width: Number(widthInput.value) }));
   captionInput.addEventListener("input", () => writeImage({ alt: captionInput.value }));
   captionInput.addEventListener("keydown", (e) => {
     if (e.key === "Enter") editor.focus();
@@ -389,6 +392,9 @@ export async function startEditor(root: HTMLElement): Promise<void> {
   let turn = 0; // quarter turns clockwise
   let crop: { x: number; y: number; w: number; h: number } | null = null; // in canvas pixels
   let editing: ImageRef | null = null;
+  // Where that image starts, in a form that follows co-editors' typing while
+  // the cropper is open, and which text it's in.
+  let editingAt: { doc: Doc; pos: Y.RelativePosition } | null = null;
 
   function drawCrop() {
     if (!source) return;
@@ -408,6 +414,7 @@ export async function startEditor(root: HTMLElement): Promise<void> {
   $<HTMLButtonElement>("[data-image-edit]").addEventListener("click", async () => {
     if (!current) return;
     editing = current;
+    editingAt = { doc, pos: Y.createRelativePositionFromTypeIndex(texts[doc], current.from) };
     const img = new Image();
     img.src = new URL(current.src, location.origin).href;
     try {
@@ -473,8 +480,9 @@ export async function startEditor(root: HTMLElement): Promise<void> {
   $<HTMLButtonElement>("[data-crop-cancel]").addEventListener("click", () => cropper.close());
 
   $<HTMLButtonElement>("[data-crop-save]").addEventListener("click", async () => {
-    if (!source || !editing) return;
+    if (!source || !editing || !editingAt) return;
     const ref = editing;
+    const where = editingAt;
     if (turn === 0 && !crop) return cropper.close();
     const area = crop ?? { x: 0, y: 0, w: canvas.width, h: canvas.height };
     const out = document.createElement("canvas");
@@ -488,10 +496,21 @@ export async function startEditor(root: HTMLElement): Promise<void> {
     setStatus("Uploading image…", "busy");
     try {
       const url = await uploadImage(new File([blob], `${slug}-edited-${Date.now()}.${jpeg ? "jpg" : "png"}`, { type: blob.type }));
-      // Find the image again: co-editors may have typed while this was open.
-      const at = text(doc).indexOf(`](${ref.src}`);
+      // Find this image again, not another copy of it: co-editors may have
+      // typed while the cropper was open, so start from where it now begins.
+      const t = text(where.doc);
+      const start = Y.createAbsolutePositionFromRelativePosition(where.pos, ydoc)?.index ?? -1;
+      const at = start >= 0 && t.startsWith("![", start) ? t.indexOf(`](${ref.src}`, start) : -1;
       if (at < 0) return setStatus("The image moved or was removed while you edited it", "error");
-      editor.dispatch({ changes: { from: at + 2, to: at + 2 + ref.src.length, insert: url } });
+      const from = at + 2;
+      const to = from + ref.src.length;
+      // Through the editor when it shows that text, so the change can be undone.
+      if (where.doc === doc) editor.dispatch({ changes: { from, to, insert: url } });
+      else
+        ydoc.transact(() => {
+          texts[where.doc].delete(from, ref.src.length);
+          texts[where.doc].insert(from, url);
+        });
       showSaveState();
     } catch (err) {
       setStatus(`Image not uploaded: ${(err as Error).message}`, "error");
@@ -599,14 +618,24 @@ export async function startEditor(root: HTMLElement): Promise<void> {
   let merging: Promise<void> | null = null;
   let mergeNote: string | null = null;
 
-  // The saver: the lowest client id among the editors in the room.
+  // The saver: the lowest client id among the editors whose tab is showing,
+  // or among all of them when nobody's is. Browsers slow the timers of
+  // hidden tabs to as little as once a minute, so a saver in a background
+  // tab would leave everyone else waiting. Editors from before "visible"
+  // existed count as showing.
   function saverId(): number {
-    let min = ydoc.clientID;
+    let shown = Infinity;
+    let any = Infinity;
     awareness.getStates().forEach((state, id) => {
-      if (state.user && id < min) min = id;
+      if (!state.user) return;
+      any = Math.min(any, id);
+      if (state.visible !== false) shown = Math.min(shown, id);
     });
-    return min;
+    if (shown !== Infinity) return shown;
+    return any !== Infinity ? any : ydoc.clientID;
   }
+  awareness.setLocalStateField("visible", !document.hidden);
+  document.addEventListener("visibilitychange", () => awareness.setLocalStateField("visible", !document.hidden));
   const isSaver = () => saverId() === ydoc.clientID;
 
   function scheduleSave(ms: number) {
@@ -685,7 +714,9 @@ export async function startEditor(root: HTMLElement): Promise<void> {
         ydoc.transact(() => {
           for (const key of ["body", "slack"] as const) {
             // No base (a room from before merging): what's on screen wins.
-            const result = merge(base[key] ?? text(key), text(key), theirs[key]);
+            // With EmDash's text as the base, theirs has no changes of its
+            // own, so merge keeps ours.
+            const result = merge(base[key] ?? theirs[key], text(key), theirs[key]);
             clean &&= result.clean;
             if (result.text !== text(key)) {
               setText(texts[key], result.text);
