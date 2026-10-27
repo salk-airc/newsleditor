@@ -11,7 +11,7 @@
   },
   "scripts": {
     "start": "node scripts/start.mjs",
-    "dev": "astro dev",
+    "dev": "node scripts/dev.mjs",
     "build": "astro build",
     "serve": "node server.mjs",
     "typecheck": "astro check",
