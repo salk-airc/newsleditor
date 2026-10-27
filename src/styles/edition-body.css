@@ -1,0 +1,96 @@
+/* An edition's text, as /newsletter/<date> shows it. Kept in its own file so
+   anything else that shows an edition the archive's way uses the same rules.
+   Everything sits under .issue__body. */
+
+.issue__body {
+  font-size: 1.0625rem;
+}
+
+.issue__body p,
+.issue__body ul,
+.issue__body ol {
+  margin-block: 0 1.1em;
+  text-wrap: pretty;
+}
+
+.issue__body ul,
+.issue__body ol {
+  padding-left: 1.25em;
+}
+
+.issue__body li + li {
+  margin-top: 0.5em;
+}
+
+.issue__body li::marker {
+  color: var(--green-ink);
+}
+
+.issue__body h2 {
+  font-family: var(--font-display);
+  font-variation-settings: "wdth" 108;
+  font-weight: 600;
+  font-size: clamp(1.25rem, 2.6vw, 1.5rem);
+  line-height: 1.2;
+  letter-spacing: -0.015em;
+  margin-block: 2.25em 0.75em;
+  text-wrap: balance;
+}
+
+.issue__body a {
+  color: var(--ink);
+  text-decoration-color: var(--green);
+  text-decoration-thickness: 2px;
+  text-underline-offset: 3px;
+}
+
+.issue__body a:hover {
+  color: var(--green-ink);
+}
+
+.issue__body strong {
+  font-weight: 700;
+}
+
+.issue__body del {
+  color: var(--ink-soft);
+}
+
+.issue__body img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  border-radius: 4px;
+}
+
+.issue__body figure {
+  margin-block: 1.5em;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+/* Every image links to its full-size original (.zoom wraps it). */
+.issue__body .zoom {
+  display: block;
+  cursor: zoom-in;
+}
+
+/* --w is the width the author chose ("w=200", else 320px in a row; a lone
+   image without one fills the column). In a row, each image starts at 70% of
+   it and grows back to the full width when there's room; if even 70% doesn't
+   fit, it wraps onto its own line at full size. Small images stay together on
+   a phone and large ones stack at a readable size, whatever they show. */
+.issue__body figure .zoom {
+  flex: 1 1 calc(var(--w, 100%) * 0.7);
+  max-width: min(var(--w, 100%), 100%);
+}
+
+.issue__body figure img {
+  width: 100%;
+}
+
+.issue__body p .zoom img {
+  margin-block: 0.5em;
+  border: 1px solid var(--rule);
+}

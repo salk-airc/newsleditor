@@ -1,0 +1,160 @@
+---
+import Newsletter from "../../layouts/Newsletter.astro";
+import { formatDate, getEditions, getSettings, readingMinutes, sectionsOf, weekdayName } from "../../lib/newsletter";
+
+// Rendered per request: editions live in EmDash, so a new one shows up as
+// soon as it's published, without a rebuild.
+export const prerender = false;
+
+const { settings } = await getSettings();
+const day = weekdayName(settings.weekday);
+
+// Headers end with an emoji ("… Engineers! 🎉"). A non-breaking space keeps it
+// on the line with the last word instead of wrapping onto a line of its own.
+function keepTrailingEmoji(text: string): string {
+  return text.replace(/ (\p{Extended_Pictographic}[\p{Extended_Pictographic}\u{FE0F}\u{200D}]*)$/u, "\u00A0$1");
+}
+
+const editions = (await getEditions()).map((edition) => {
+  const sections = sectionsOf(edition.body);
+  return {
+    ...edition,
+    lead: keepTrailingEmoji(sections[0]?.title ?? formatDate(edition.date)),
+    more: sections.slice(1).map((s) => s.title),
+    minutes: readingMinutes(edition.body),
+  };
+});
+---
+
+<Newsletter title={settings.name} description={`Every edition of ${settings.name}.`}>
+  <section class="intro shell">
+    {day && <p class="label intro__eyebrow">Every {day}</p>}
+    <h1 class="display intro__title">{settings.name}</h1>
+    <p class="prose intro__lead">
+      {editions.length ? "Every edition sent so far, newest first." : "Sent editions will be listed here, newest first."}
+    </p>
+  </section>
+
+  <ol class="editions shell" reversed>
+    {
+      editions.map((edition) => (
+        <li class="edition">
+          <a class="edition__link" href={`/newsletter/${edition.slug}`}>
+            <p class="edition__meta">
+              <span class="node" aria-hidden="true" />
+              <time class="label" datetime={edition.date.toISOString().slice(0, 10)}>
+                {formatDate(edition.date)}
+              </time>
+              <span class="edition__minutes">{edition.minutes} min read</span>
+            </p>
+            <h2 class="display edition__lead">
+              <span class="edition__lead-text">{edition.lead}</span>
+            </h2>
+            {edition.more.length > 0 && <p class="edition__more">Also: {edition.more.join(" · ")}</p>}
+          </a>
+        </li>
+      ))
+    }
+  </ol>
+
+  {editions.length === 0 && <p class="prose shell empty">No editions published yet.</p>}
+</Newsletter>
+
+<style>
+  .intro {
+    max-width: 44rem;
+    /* Same top space as an edition page, so the two line up when you click through. */
+    padding-block: clamp(2rem, 6vh, 3.5rem) clamp(2rem, 5vh, 3rem);
+  }
+
+  .intro__eyebrow {
+    color: var(--green-ink);
+    margin-bottom: 1rem;
+  }
+
+  .intro__title {
+    font-size: clamp(2.1rem, 6vw, 3.6rem);
+  }
+
+  .intro__lead {
+    margin-top: 1.25rem;
+    max-width: var(--measure);
+    font-size: 1.0625rem;
+  }
+
+  .editions {
+    max-width: 44rem;
+    list-style: none;
+    padding: 0;
+    margin-block: 0;
+    border-top: 1px solid var(--rule);
+  }
+
+  .edition {
+    border-bottom: 1px solid var(--rule);
+  }
+
+  /* The footer's own rule closes the list. */
+  .edition:last-child {
+    border-bottom: none;
+  }
+
+  .edition__link {
+    display: block;
+    padding-block: clamp(1.5rem, 3.5vh, 2.25rem);
+    text-decoration: none;
+  }
+
+  .edition__meta {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    color: var(--ink-soft);
+  }
+
+  .edition__minutes {
+    font-size: 0.875rem;
+  }
+
+  .edition__minutes::before {
+    content: "·";
+    margin-right: 0.75rem;
+  }
+
+  .edition__lead {
+    margin-top: 0.75rem;
+    font-size: clamp(1.35rem, 3vw, 1.85rem);
+    line-height: 1.12;
+  }
+
+  /* The hover underline lives on an inner span, so the heading itself stays a
+     block and the .display style's balanced wrapping still applies. */
+  .edition__lead-text {
+    background-image: linear-gradient(var(--green), var(--green));
+    background-repeat: no-repeat;
+    background-position: 0 100%;
+    background-size: 0% 2px;
+    transition: background-size 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+    /* Underline every line of a wrapped headline, not one span across them. */
+    -webkit-box-decoration-break: clone;
+    box-decoration-break: clone;
+  }
+
+  .edition__link:hover .edition__lead-text,
+  .edition__link:focus-visible .edition__lead-text {
+    background-size: 100% 2px;
+  }
+
+  .edition__more {
+    margin-top: 0.75rem;
+    color: var(--ink-soft);
+    font-size: 0.95rem;
+    text-wrap: pretty;
+  }
+
+  /* In the same column as the intro and the list. */
+  .empty {
+    max-width: 44rem;
+    padding-block: 3rem;
+  }
+</style>
