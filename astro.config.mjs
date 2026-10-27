@@ -93,6 +93,15 @@ export default defineConfig({
       // An edition's body is markdown rendered to one block of HTML, edited in
       // the studio at /newsletter/edit rather than on the page.
       toolbar: false,
+      plugins: [
+        {
+          id: "newsletter",
+          version: "0.1.0",
+          // Absolute path: EmDash imports this from a generated virtual
+          // module, where a relative specifier would not resolve.
+          entrypoint: fileURLToPath(new URL("./src/plugins/newsletter/index.ts", import.meta.url)),
+        },
+      ],
     }),
   ],
 
