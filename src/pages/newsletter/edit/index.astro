@@ -1,0 +1,204 @@
+---
+import Newsletter from "../../../layouts/Newsletter.astro";
+import {
+  canEdit,
+  editionTitle,
+  formatDate,
+  getEditions,
+  getSettings,
+  nextOpenEditionDate,
+  starterBody,
+} from "../../../lib/newsletter";
+
+// The way into the editor, which is for drafting: the editions not published
+// yet, and a button to start the next one. Published editions are in the
+// archive and aren't edited here. Same gate as the editor itself.
+
+export const prerender = false;
+
+const user = Astro.locals.user;
+if (!user) {
+  return Astro.redirect(`/_emdash/admin/login?redirect=${encodeURIComponent(Astro.url.pathname)}`);
+}
+const allowed = canEdit(user);
+if (!allowed) Astro.response.status = 403;
+Astro.response.headers.set("Cache-Control", "private, no-store");
+
+const [drafts, published] = allowed ? await Promise.all([getEditions("draft"), getEditions()]) : [[], []];
+// Soonest first: the one being written now is at the top.
+drafts.sort((a, b) => a.date.getTime() - b.date.getTime());
+const { settings } = await getSettings();
+const next = nextOpenEditionDate(settings, new Set([...drafts, ...published].map((e) => e.slug)));
+const starter = {
+  slug: next.slug,
+  data: {
+    title: editionTitle(settings, next.date),
+    edition_date: next.date.toISOString(),
+    body: starterBody(settings, next.date),
+  },
+};
+---
+
+<Newsletter title={`Drafts — ${settings.name}`}>
+  <section class="studio shell">
+    <h1 class="display studio__title">Drafts</h1>
+    {
+      allowed ? (
+        <>
+          <p class="studio__intro">
+            Editions being written. Nothing here is in the archive until it's published in{" "}
+            <a href="/_emdash/admin">the admin</a>.
+          </p>
+          {drafts.length > 0 && (
+            <ol class="studio__list">
+              {drafts.map((e) => (
+                <li>
+                  <a class="studio__row" href={`/newsletter/edit/${e.slug}`}>
+                    <time class="studio__date" datetime={e.date.toISOString().slice(0, 10)}>
+                      {formatDate(e.date)}
+                    </time>
+                    <span class="studio__name">{e.title}</span>
+                  </a>
+                </li>
+              ))}
+            </ol>
+          )}
+          <p class="studio__start">
+            <button type="button" class="studio__new" data-start={JSON.stringify(starter)}>
+              Start the {formatDate(next.date)} edition
+            </button>
+            <span class="studio__error" data-start-error role="alert" />
+          </p>
+        </>
+      ) : (
+        <p class="prose">
+          You're signed in as {user.email}, which can't edit editions. Editing is for Editors and Admins; ask an
+          Admin to change your role in <a href="/_emdash/admin">the admin</a>.
+        </p>
+      )
+    }
+  </section>
+</Newsletter>
+
+<script>
+  // Creates the draft through EmDash's content API, as the signed-in editor,
+  // then opens it. EmDash makes new content a draft, so nothing is published.
+  const button = document.querySelector<HTMLButtonElement>("[data-start]");
+  const error = document.querySelector<HTMLElement>("[data-start-error]");
+  button?.addEventListener("click", async () => {
+    const starter = JSON.parse(button.dataset.start!) as { slug: string };
+    button.disabled = true;
+    try {
+      const res = await fetch("/_emdash/api/content/editions", {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "content-type": "application/json", "x-emdash-request": "1" },
+        body: button.dataset.start,
+      });
+      if (!res.ok) {
+        const json = await res.json().catch(() => null);
+        throw new Error(json?.error?.message ?? `HTTP ${res.status}`);
+      }
+      location.href = `/newsletter/edit/${starter.slug}`;
+    } catch (err) {
+      button.disabled = false;
+      if (error) error.textContent = `Couldn't start it: ${(err as Error).message}`;
+    }
+  });
+</script>
+
+<style>
+  .studio {
+    max-width: 48rem;
+    padding-block: clamp(2rem, 6vh, 3.5rem) 4rem;
+  }
+
+  .studio__title {
+    font-size: clamp(2rem, 5vw, 2.8rem);
+    margin-bottom: 1.5rem;
+  }
+
+  .studio__list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    border-top: 1px solid var(--rule);
+  }
+
+  .studio__row {
+    display: grid;
+    grid-template-columns: 7.5rem minmax(0, 1fr);
+    align-items: baseline;
+    gap: 1rem;
+    padding: 0.9rem 0;
+    border-bottom: 1px solid var(--rule);
+    color: var(--ink);
+    text-decoration: none;
+  }
+
+  .studio__row:hover .studio__name {
+    color: var(--green-ink);
+  }
+
+  .studio__date {
+    font-family: var(--font-display);
+    color: var(--ink-soft);
+    white-space: nowrap;
+  }
+
+  .studio__name {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .studio__intro {
+    color: var(--ink-soft);
+    margin-bottom: 1.5rem;
+  }
+
+  .studio__start {
+    margin-top: 1.5rem;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 1rem;
+  }
+
+  .studio__new {
+    font: inherit;
+    font-weight: 600;
+    border: 0;
+    border-radius: 6px;
+    padding: 0.6rem 1rem;
+    cursor: pointer;
+    background: var(--blue);
+    color: #fff;
+  }
+
+  .studio__new:hover {
+    filter: brightness(1.1);
+  }
+
+  .studio__new:disabled {
+    opacity: 0.6;
+    cursor: progress;
+  }
+
+  .studio__error {
+    color: #b3261e;
+    font-size: 0.9rem;
+  }
+
+  @media (max-width: 36rem) {
+    .studio__row {
+      grid-template-columns: minmax(0, 1fr);
+      gap: 0.25rem;
+    }
+
+    .studio__name {
+      white-space: normal;
+    }
+  }
+</style>
