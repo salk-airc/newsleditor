@@ -17,6 +17,7 @@ const path = Astro.url.pathname.replace(/\/$/, "");
 const links = [
   { href: "/newsletter", label: "Archive", show: true },
   { href: "/newsletter/edit", label: "Drafts", show: editor },
+  { href: "/newsletter/theme", label: "Theme", show: editor },
 ].filter((link) => link.show);
 ---
 
