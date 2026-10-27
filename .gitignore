@@ -1,0 +1,21 @@
+# build output
+dist/
+.astro/
+
+# dependencies
+node_modules/
+
+# the newsletter's data: database, uploaded images, live co-editing copies
+data/
+
+# environment
+.env
+.env.*
+!.env.example
+
+# macOS
+.DS_Store
+
+# logs
+*.log
+npm-debug.log*

@@ -1,0 +1,27 @@
+{
+  "version": "1",
+  "meta": {
+    "name": "newsletteditor",
+    "description": "A newsletter studio: one collection of editions, written in markdown."
+  },
+  "collections": [
+    {
+      "slug": "editions",
+      "label": "Newsletter editions",
+      "labelSingular": "Edition",
+      "description": "One entry per edition. The body is markdown; edit it in the studio at /newsletter/edit.",
+      "supports": ["drafts", "revisions"],
+      "titleField": "title",
+      "dateField": "edition_date",
+      "fields": [
+        { "slug": "title", "type": "string", "label": "Subject", "required": true },
+        { "slug": "edition_date", "type": "datetime", "label": "Edition date (the day it goes out)", "required": true },
+        { "slug": "summary", "type": "text", "label": "One-line summary" },
+        { "slug": "body", "type": "text", "label": "Body (markdown)", "required": true },
+        { "slug": "notes", "type": "text", "label": "Editor notes (never published or sent)" },
+        { "slug": "slack", "type": "text", "label": "Slack TL;DR (markdown)" },
+        { "slug": "sent_at", "type": "datetime", "label": "Sent at" }
+      ]
+    }
+  ]
+}
