@@ -1,0 +1,138 @@
+---
+import Newsletter from "../../layouts/Newsletter.astro";
+import { formatDate, getEditions, getSettings, readingMinutes } from "../../lib/newsletter";
+import { renderWeb } from "../../plugins/newsletter/web.ts";
+import "../../styles/edition-body.css";
+
+export const prerender = false;
+
+const editions = await getEditions();
+const index = editions.findIndex((e) => e.slug === Astro.params.slug);
+const edition = editions[index];
+if (!edition) Astro.response.status = 404;
+
+// Newest first, so the newer edition sits before this one in the list.
+const newer = index > 0 ? editions[index - 1] : undefined;
+const older = edition ? editions[index + 1] : undefined;
+const { html } = edition ? renderWeb(edition.body) : { html: "" };
+const { settings } = await getSettings();
+---
+
+<Newsletter
+  title={edition ? edition.title : `Edition not found — ${settings.name}`}
+  description={edition?.summary ?? undefined}
+>
+  {
+    edition ? (
+      <article class="issue shell">
+        <a class="issue__back label" href="/newsletter">
+          ← All editions
+        </a>
+        <header class="issue__header">
+          <p class="label issue__eyebrow">{settings.name}</p>
+          <h1 class="display issue__title">
+            <time datetime={edition.date.toISOString().slice(0, 10)}>{formatDate(edition.date)}</time>
+          </h1>
+          <p class="issue__meta">{readingMinutes(edition.body)} min read</p>
+        </header>
+
+        <div class="issue__body" set:html={html} />
+
+        <nav class="issue__nav" aria-label="More editions">
+          {older ? (
+            <a class="issue__step issue__step--older" href={`/newsletter/${older.slug}`}>
+              <span class="label">Older</span>
+              <span class="issue__step-date">{formatDate(older.date)}</span>
+            </a>
+          ) : (
+            <span />
+          )}
+          {newer && (
+            <a class="issue__step issue__step--newer" href={`/newsletter/${newer.slug}`}>
+              <span class="label">Newer</span>
+              <span class="issue__step-date">{formatDate(newer.date)}</span>
+            </a>
+          )}
+        </nav>
+      </article>
+    ) : (
+      <section class="issue shell">
+        <h1 class="display issue__title">Edition not found</h1>
+        <p class="prose">
+          <a href="/newsletter">See every edition</a>
+        </p>
+      </section>
+    )
+  }
+</Newsletter>
+
+<style>
+  .issue {
+    max-width: 40rem;
+    padding-top: clamp(2rem, 6vh, 3.5rem);
+  }
+
+  .issue__back {
+    color: var(--ink-soft);
+    text-decoration: none;
+  }
+
+  .issue__back:hover {
+    color: var(--ink);
+  }
+
+  .issue__header {
+    margin-block: 2rem 2.5rem;
+    padding-bottom: 2rem;
+    border-bottom: 1px solid var(--rule);
+  }
+
+  .issue__eyebrow {
+    color: var(--green-ink);
+    margin-bottom: 0.75rem;
+  }
+
+  .issue__title {
+    font-size: clamp(2.1rem, 6vw, 3.4rem);
+  }
+
+  .issue__meta {
+    margin-top: 0.75rem;
+    color: var(--ink-soft);
+    font-size: 0.9rem;
+  }
+
+  /* --------------------------------------------------------- nav ---- */
+
+  .issue__nav {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-top: 3rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--rule);
+  }
+
+  .issue__step {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    text-decoration: none;
+    color: var(--ink-soft);
+  }
+
+  .issue__step--newer {
+    text-align: right;
+    margin-left: auto;
+  }
+
+  .issue__step-date {
+    font-family: var(--font-display);
+    font-size: 1.15rem;
+    color: var(--ink);
+  }
+
+  .issue__step:hover .issue__step-date {
+    color: var(--green-ink);
+  }
+</style>

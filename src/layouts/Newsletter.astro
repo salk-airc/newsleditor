@@ -1,0 +1,128 @@
+---
+import Base from "./Base.astro";
+import { canEdit, getSettings } from "../lib/newsletter";
+
+// Shell for every newsletter page: a header with the newsletter's name and,
+// for editors, links to the drafts, the theme and the settings.
+
+interface Props {
+  title: string;
+  description?: string;
+}
+
+const { title, description } = Astro.props;
+const { settings } = await getSettings();
+const editor = canEdit(Astro.locals.user);
+const path = Astro.url.pathname.replace(/\/$/, "");
+const links = [
+  { href: "/newsletter", label: "Archive", show: true },
+  { href: "/newsletter/edit", label: "Drafts", show: editor },
+  { href: "/newsletter/theme", label: "Theme", show: editor },
+  { href: "/newsletter/setup", label: "Settings", show: editor },
+].filter((link) => link.show);
+---
+
+<Base title={title} description={description}>
+  <header class="masthead">
+    <div class="masthead__inner shell">
+      <a class="masthead__home" href="/newsletter">
+        <span class="node" aria-hidden="true"></span>
+        <span class="masthead__word">{settings.name}</span>
+      </a>
+      <nav class="masthead__nav">
+        {
+          links.map((link) => (
+            <a class="masthead__section label" href={link.href} aria-current={path === link.href ? "page" : undefined}>
+              {link.label}
+            </a>
+          ))
+        }
+        <a class="masthead__section label" href="/_emdash/admin">Admin</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <slot />
+  </main>
+
+  <footer class="footer">
+    <div class="footer__inner shell">
+      <p class="footer__meta">
+        {settings.name}
+        <span class="footer__sep" aria-hidden="true">·</span>
+        made with <a href="https://github.com/salk-airc/newsletteditor" rel="noopener">newsletteditor</a>
+      </p>
+    </div>
+  </footer>
+</Base>
+
+<style>
+  .masthead {
+    border-bottom: 1px solid var(--rule);
+  }
+
+  .masthead__inner {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem 1.5rem;
+    padding-block: 1rem;
+  }
+
+  .masthead__home {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.6rem;
+    text-decoration: none;
+  }
+
+  .masthead__word {
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: 1.2rem;
+    letter-spacing: -0.02em;
+  }
+
+  .masthead__nav {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem 1.5rem;
+  }
+
+  .masthead__section {
+    color: var(--ink-soft);
+    text-decoration: none;
+  }
+
+  .masthead__section:hover,
+  .masthead__section[aria-current="page"] {
+    color: var(--ink);
+  }
+
+  .footer {
+    border-top: 1px solid var(--rule);
+    padding-block: 2rem 2.5rem;
+    margin-top: clamp(3rem, 8vh, 5rem);
+  }
+
+  .footer__meta {
+    font-size: 0.875rem;
+    color: var(--ink-soft);
+  }
+
+  .footer__meta a {
+    color: inherit;
+    text-decoration-color: var(--rule-strong);
+    text-underline-offset: 3px;
+  }
+
+  .footer__meta a:hover {
+    color: var(--ink);
+  }
+
+  .footer__sep {
+    margin-inline: 0.5rem;
+  }
+</style>
