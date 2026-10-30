@@ -59,6 +59,23 @@ To use Claude Code to set this up, open Claude Code in this folder and say "help
 - **Roles.** Editors and Admins can write editions, change the theme and the settings. Anyone with an account can read the archive. Only Admins can connect Claude.
 - **Email sign-in links** need an email provider plugin for EmDash. Without one, everyone uses passkeys, which is the simpler setup on a laptop anyway.
 - **Passkeys need a secure address**: `http://localhost` works, and so does any `https://` address. A server reached over plain `http://` from another computer won't let anyone sign in, so put it [behind HTTPS](#on-a-server).
+- **Or sign in with your organisation's accounts** (below), alongside passkeys.
+
+### Sign in with your organisation
+
+newsleditor can add a **Sign in with …** button for any OpenID Connect provider: your organisation's Microsoft Entra, Google, or a sign-in service in front of one. It's still invite-only: a valid sign-in from someone without an account here is turned away. An Admin invites each writer under **Users > Invite**, and they accept with the button. An Admin can also let in everyone from a domain under **Users > Allowed domains**, but nothing is let in that way unless they do.
+
+Make an app (a "client") with the provider, with the redirect URL `https://<your address>/_emdash/api/auth/oidc/callback`, then set:
+
+| Variable | What it is |
+|---|---|
+| `OIDC_ISSUER` | The provider's issuer. Microsoft Entra: `https://login.microsoftonline.com/<tenant id>/v2.0`. Google: `https://accounts.google.com` |
+| `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET` | The app's id and secret |
+| `OIDC_LABEL` | The button's name: "Sign in with *Salk*" |
+| `OIDC_FIRST_ADMIN` | The email that may make the first account, the Admin. Without it, whoever signs in first does |
+| `OIDC_TRUST_EMAIL` | `1` to accept addresses the provider doesn't mark as verified. Microsoft Entra doesn't, so set it for an Entra app that only your organisation can sign in to (single tenant) |
+
+The button is built in, so `npm start` rebuilds after these change in `.env`.
 
 ## Writing an edition
 
