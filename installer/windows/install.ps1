@@ -8,7 +8,8 @@
   2. Asks for the setup code, in a small window. Run again without a new code
      to update newsleditor and keep its settings.
   3. Gets Node.js (the current LTS, checked against nodejs.org's checksums)
-     into the install folder: nothing else on the computer changes.
+     into the install folder, and the Microsoft Visual C++ runtime if the
+     computer doesn't have it (newsleditor's native modules need it).
   4. Gets newsleditor (-Source: a zip of it; default the main branch on
      GitHub), writes its settings from the code, and builds it.
   5. If the code has a tunnel token: installs cloudflared and connects the
@@ -168,6 +169,24 @@ if (-not $have -or $have -lt $MinNode -or $have.Major -gt $MaxNodeMajor) {
   Remove-Item -Recurse -Force $tmp, $zip
   Write-Host "Node.js $($release.version)"
 }
+# The Microsoft Visual C++ runtime: newsleditor's native modules (satteri's
+# markdown parser) need VCRUNTIME140.dll. Node.js carries its own copy inside,
+# so a fresh Windows can run Node and still not have it. It's shared with other
+# software, so uninstall.ps1 leaves it.
+if (-not (Test-Path (Join-Path $env:SystemRoot "System32\vcruntime140.dll"))) {
+  Say "Installing the Microsoft Visual C++ runtime"
+  $vc = Join-Path $env:TEMP "vc_redist.x64.exe"
+  Invoke-WebRequest "https://aka.ms/vs/17/release/vc_redist.x64.exe" -OutFile $vc -UseBasicParsing
+  $sig = Get-AuthenticodeSignature $vc
+  if ($sig.Status -ne "Valid" -or $sig.SignerCertificate.Subject -notlike "*O=Microsoft Corporation*") {
+    Remove-Item $vc; Fail "The Visual C++ runtime download wasn't signed by Microsoft. Try again."
+  }
+  $p = Start-Process $vc -ArgumentList "/install /quiet /norestart" -Wait -PassThru
+  Remove-Item $vc
+  # 1638: a newer one is already there; 3010: installed, a restart finishes it (not needed to load it).
+  if ($p.ExitCode -notin 0, 1638, 3010) { Fail "Installing the Visual C++ runtime failed (code $($p.ExitCode))." }
+}
+
 $env:Path = "$NodeDir;$env:Path"
 $node = Join-Path $NodeDir "node.exe"
 $npm = Join-Path $NodeDir "npm.cmd"
