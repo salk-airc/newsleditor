@@ -111,6 +111,25 @@ export function applyPatch(theme: Theme, patch: ThemePatch): Theme {
   };
 }
 
+/**
+ * The fields of next that differ from saved, as a patch. Saving only these
+ * doesn't undo a change made meanwhile elsewhere (Claude, another editor) to
+ * fields nobody touched. Colours compare without case.
+ */
+export function themeChanges(saved: Theme, next: Theme): ThemePatch {
+  const patch: Record<string, unknown> = {};
+  for (const key of Object.keys(next) as (keyof Theme)[]) {
+    if (key === "colors" || key === "banner") {
+      const was = saved[key] as Record<string, unknown>;
+      const part = Object.fromEntries(
+        Object.entries(next[key]).filter(([k, v]) => String(v).toLowerCase() !== String(was[k]).toLowerCase()),
+      );
+      if (Object.keys(part).length) patch[key] = part;
+    } else if (next[key] !== saved[key]) patch[key] = next[key];
+  }
+  return patch as ThemePatch;
+}
+
 // ------------------------------------------------------------ colour math --
 
 type RGB = [number, number, number];
@@ -190,6 +209,8 @@ export function checkTheme(theme: Theme): ThemeCheck {
   // opened the email.
   if (theme.logo && !/^\/(?!\/)/.test(theme.logo))
     errors.push("The logo must be an image on this site: upload it (a path like /_emdash/api/media/file/...), not a link to another site.");
+  if (theme.logo && /\.svg(\?|$)/i.test(theme.logo))
+    warnings.push("The logo is an SVG, which Gmail and Outlook don't show: it will be missing in most inboxes. Upload a PNG instead.");
   return { errors, warnings };
 }
 

@@ -1,0 +1,351 @@
+---
+import Newsletter from "../../layouts/Newsletter.astro";
+import { canEdit } from "../../lib/newsletter";
+import { FONTS } from "../../plugins/newsletter/theme.ts";
+
+// The newsletter's theme: name, logo, colours, font and glow banner, with the
+// email previewed live as they change (src/scripts/theme-editor.ts). Saved
+// through the newsletter plugin's theme-update route, which refuses a theme
+// that would be hard to read. Claude edits the same theme through the
+// plugin's theme tools. Same gate as the editor.
+
+export const prerender = false;
+
+const user = Astro.locals.user;
+if (!user) {
+  return Astro.redirect(`/_emdash/admin/login?redirect=${encodeURIComponent(Astro.url.pathname)}`);
+}
+const allowed = canEdit(user);
+if (!allowed) Astro.response.status = 403;
+Astro.response.headers.set("Cache-Control", "private, no-store");
+
+const colors = [
+  ["page", "Page", "The whole email's background. Keep it light."],
+  ["ink", "Text", "Headings and body text. Near-black, so phone dark modes turn it white."],
+  ["muted", "Muted text", "Dates, captions, the tagline."],
+  ["accent", "Accent", "Links, bullets, the end of the name, buttons, the first glow."],
+  ["accent2", "Second accent", "The wordmark, the second glow, the end of the rules."],
+  ["rule", "Lines", "The thin line above the signature."],
+] as const;
+---
+
+<Newsletter title="Theme">
+  <section class="theme shell">
+    <h1 class="display theme__title">Theme</h1>
+    {
+      allowed ? (
+        <div class="theme__grid" data-theme-editor>
+          <form class="theme__form" data-form>
+            <p class="theme__intro">
+              How the newsletter looks. Changes show in the preview right away and apply to every draft once saved. You
+              can also ask Claude to change it.
+            </p>
+
+            <fieldset>
+              <legend>Name</legend>
+              <label>
+                Name <input name="nameLead" required maxlength="60" />
+              </label>
+              <label>
+                In the accent colour <input name="nameTail" maxlength="40" />
+              </label>
+              <label>
+                Footer line <input name="footer" maxlength="160" />
+              </label>
+            </fieldset>
+
+            <fieldset>
+              <legend>Logo</legend>
+              <div class="theme__logo">
+                <img data-logo-img alt="" hidden />
+                <span data-logo-none>No logo</span>
+                <label class="theme__button">
+                  Upload… <input type="file" accept="image/png,image/jpeg,image/gif" data-logo-file hidden />
+                </label>
+                <button type="button" class="theme__button" data-logo-clear>Remove</button>
+              </div>
+              <p class="theme__hint">
+                A transparent PNG works best; it's shown 40px tall. Not SVG: Gmail and Outlook don't show SVG images.
+              </p>
+              <label>
+                Wordmark <input name="wordmark" maxlength="24" />
+              </label>
+              <label>
+                Tagline <textarea name="tagline" rows="2" maxlength="120" />
+              </label>
+            </fieldset>
+
+            <fieldset>
+              <legend>Colours</legend>
+              {
+                colors.map(([key, label, hint]) => (
+                  <label class="theme__color">
+                    <input type="color" data-color={key} />
+                    <span>
+                      <span class="theme__color-name">{label}</span>
+                      <span class="theme__hint">{hint}</span>
+                    </span>
+                    <input class="theme__hex" data-hex={key} maxlength="7" spellcheck="false" aria-label={`${label} hex`} />
+                  </label>
+                ))
+              }
+            </fieldset>
+
+            <fieldset>
+              <legend>Type and art</legend>
+              <label>
+                Font
+                <select name="font">
+                  {Object.entries(FONTS).map(([key, f]) => (
+                    <option value={key}>{f.label}</option>
+                  ))}
+                </select>
+              </label>
+              <label class="theme__check">
+                <input type="checkbox" data-banner-on /> Glow banner across the top
+              </label>
+              <label>
+                Glow strength <input type="range" min="0" max="100" step="5" data-banner-strength />
+              </label>
+            </fieldset>
+
+            <ul class="theme__problems" data-problems aria-live="polite" />
+
+            <p class="theme__actions">
+              <button type="submit" class="theme__save" data-save>Save theme</button>
+              <button type="button" class="theme__button" data-reset>Undo changes</button>
+              <span class="theme__status" data-status role="status" />
+            </p>
+          </form>
+
+          <div class="theme__preview">
+            <div class="theme__preview-bar">
+              <span class="label">Preview</span>
+              <label class="theme__check">
+                <input type="checkbox" data-dark /> Rough dark mode
+              </label>
+            </div>
+            <iframe class="theme__frame" data-preview title="Email preview" sandbox="allow-same-origin" />
+          </div>
+        </div>
+      ) : (
+        <p class="prose">
+          You're signed in as {user.email}, which can't change the theme. That's for Editors and Admins; ask an Admin
+          to change your role in <a href="/_emdash/admin">the admin</a>.
+        </p>
+      )
+    }
+  </section>
+</Newsletter>
+
+<script>
+  import { startThemeEditor } from "../../scripts/theme-editor.ts";
+
+  const root = document.querySelector<HTMLElement>("[data-theme-editor]");
+  if (root) startThemeEditor(root);
+</script>
+
+<style>
+  .theme {
+    max-width: 82rem;
+    padding-block: clamp(2rem, 6vh, 3.5rem) 4rem;
+  }
+
+  .theme__title {
+    font-size: clamp(2rem, 5vw, 2.8rem);
+    margin-bottom: 1.5rem;
+  }
+
+  .theme__grid {
+    display: grid;
+    grid-template-columns: minmax(0, 24rem) minmax(0, 1fr);
+    gap: 2rem;
+    align-items: start;
+  }
+
+  .theme__intro,
+  .theme__hint {
+    color: var(--ink-soft);
+  }
+
+  .theme__hint {
+    display: block;
+    font-size: 0.8rem;
+  }
+
+  fieldset {
+    border: 0;
+    border-top: 1px solid var(--rule);
+    margin: 1.25rem 0 0;
+    padding: 1rem 0 0;
+    display: grid;
+    gap: 0.75rem;
+  }
+
+  legend {
+    font-weight: 600;
+    padding: 0;
+  }
+
+  label {
+    display: grid;
+    gap: 0.25rem;
+    font-size: 0.9rem;
+  }
+
+  input:not([type="color"], [type="checkbox"], [type="range"], [type="file"]),
+  textarea,
+  select {
+    font: inherit;
+    padding: 0.4rem 0.5rem;
+    border: 1px solid var(--rule-strong, var(--rule));
+    border-radius: 6px;
+    background: transparent;
+    color: inherit;
+  }
+
+  .theme__logo {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+  }
+
+  .theme__logo img {
+    height: 40px;
+    width: auto;
+  }
+
+  .theme__color {
+    grid-template-columns: 2.4rem minmax(0, 1fr) 5.5rem;
+    align-items: center;
+    gap: 0.6rem;
+  }
+
+  .theme__color input[type="color"] {
+    width: 2.4rem;
+    height: 2.4rem;
+    padding: 0;
+    border: 1px solid var(--rule);
+    border-radius: 8px;
+    background: none;
+    cursor: pointer;
+  }
+
+  .theme__color-name {
+    font-weight: 500;
+  }
+
+  .theme__hex {
+    font-family: var(--font-mono, monospace);
+    font-size: 0.85rem;
+  }
+
+  .theme__check {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .theme__problems {
+    list-style: none;
+    margin: 1.25rem 0 0;
+    padding: 0;
+    display: grid;
+    gap: 0.5rem;
+    font-size: 0.85rem;
+  }
+
+  .theme__problems li {
+    padding: 0.5rem 0.7rem;
+    border-radius: 6px;
+    border-left: 3px solid;
+  }
+
+  .theme__problems [data-kind="error"] {
+    border-color: #b3261e;
+    background: rgba(179, 38, 30, 0.08);
+  }
+
+  .theme__problems [data-kind="warning"] {
+    border-color: #b07a00;
+    background: rgba(176, 122, 0, 0.08);
+  }
+
+  .theme__actions {
+    margin-top: 1.25rem;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.75rem;
+  }
+
+  .theme__save,
+  .theme__button {
+    font: inherit;
+    font-size: 0.9rem;
+    border-radius: 6px;
+    padding: 0.45rem 0.9rem;
+    cursor: pointer;
+    display: inline-block;
+  }
+
+  .theme__save {
+    font-weight: 600;
+    border: 0;
+    background: var(--blue);
+    color: #fff;
+  }
+
+  .theme__save:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+
+  .theme__button {
+    border: 1px solid var(--rule);
+    background: transparent;
+    color: inherit;
+  }
+
+  .theme__status {
+    font-size: 0.85rem;
+    color: var(--ink-soft);
+  }
+
+  .theme__preview {
+    position: sticky;
+    top: 1rem;
+  }
+
+  .theme__preview-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.5rem;
+  }
+
+  .theme__frame {
+    width: 100%;
+    height: min(80vh, 60rem);
+    border: 1px solid var(--rule);
+    border-radius: 10px;
+    background: #fff;
+  }
+
+  /* A full inversion, roughly what a phone's dark mode does to an email:
+     text and backgrounds flip, images don't (they're flipped back inside). */
+  .theme__frame.is-dark {
+    filter: invert(1) hue-rotate(180deg);
+  }
+
+  @media (max-width: 60rem) {
+    .theme__grid {
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    .theme__preview {
+      position: static;
+    }
+  }
+</style>
