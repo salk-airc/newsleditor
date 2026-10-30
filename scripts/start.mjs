@@ -5,8 +5,10 @@
 import { spawnSync } from "node:child_process";
 import { existsSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 
-const root = new URL("..", import.meta.url).pathname;
+// fileURLToPath, not .pathname: on Windows that's "/C:/Program%20Files/…", which isn't a path.
+const root = fileURLToPath(new URL("..", import.meta.url));
 const built = join(root, "dist/server/entry.mjs");
 
 function newest(path) {
@@ -23,7 +25,10 @@ const stale = !existsSync(built) || Math.max(...sources.map(newest)) > statSync(
 
 if (stale) {
   console.log("Building the site (first start, or the code changed)...");
-  const result = spawnSync("npx", ["astro", "build"], { cwd: root, stdio: "inherit" });
+  // Astro through this same node, not npx: on Windows npx is a .cmd, which
+  // spawnSync can't run without a shell (it fails with no message at all).
+  const result = spawnSync(process.execPath, [join(root, "node_modules/astro/bin/astro.mjs"), "build"], { cwd: root, stdio: "inherit" });
+  if (result.error) console.error(`Couldn't run the build: ${result.error.message}`);
   if (result.status !== 0) process.exit(result.status ?? 1);
 }
 

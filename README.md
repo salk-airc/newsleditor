@@ -13,6 +13,8 @@ It's built on [Astro](https://astro.build) and [EmDash](https://emdashcms.com), 
 
 ## Quickstart
 
+**On Windows, with a setup code** (from whoever hosts newsletters for your organisation): download [`installer/windows/Install newsleditor.cmd`](installer/windows/), double-click it, choose **Yes** to let it make changes, and paste the code. It installs Node.js and newsleditor, connects the address in the code, makes newsleditor start with the computer, and opens it. Run it again later, with the code box empty, to update. See [Setup codes](#setup-codes).
+
 On a Mac or Linux, paste this into a terminal:
 
 ```bash
@@ -138,6 +140,26 @@ newsleditor is one Node process. Settings come from environment variables, which
 | `S3_ENDPOINT`, `S3_REGION`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, `S3_PUBLIC_URL` | | The bucket's details; `S3_PUBLIC_URL` is the public address its images are read from |
 
 Changing these takes a restart. The database and storage settings are built into the site, so after changing `.env`, `npm start` rebuilds before starting. If you set them some other way (in the shell, a container), run `npm run build` after changing them.
+
+### Setup codes
+
+An organisation that hosts newsletters for its teams can hand each one a single **setup code** instead of a list of settings. The Windows installer takes it. A code is `setup1.` followed by base64url-encoded JSON:
+
+```json
+{
+  "app": "newsleditor",
+  "url": "https://news.example.org",
+  "env": { "SITE_URL": "https://news.example.org", "OIDC_ISSUER": "…", "S3_BUCKET": "…" },
+  "tunnelToken": "…"
+}
+```
+
+- `env`: the settings above, written to the installed newsleditor's `.env`. The installer adds `DATA_DIR`, `PORT` and `HOST` itself.
+- `tunnelToken` (optional): a [Cloudflare Tunnel](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/) token. The installer installs `cloudflared` and connects it as a service, so `url` reaches newsleditor on that computer with no inbound ports.
+
+It holds keys, so send it to the person setting up the computer, not to a channel.
+
+On Windows, the installer puts newsleditor in `C:\Program Files\newsleditor` and its settings and data in `C:\ProgramData\newsleditor`, where only administrators can read them. Back up `C:\ProgramData\newsleditor\data`: that's the newsletter. It runs as a scheduled task, **newsleditor**, at startup, and restarts if it stops. The installer's log is `C:\ProgramData\newsleditor\install.log`.
 
 ### On a server
 
