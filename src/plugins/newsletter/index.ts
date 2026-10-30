@@ -10,6 +10,7 @@ import {
   settingsPatchSchema,
   settingsSchema,
 } from "./settings.ts";
+import { publicMediaUrl } from "./media.ts";
 import { applyPatch, checkTheme, DEFAULT_THEME, type Theme, themePatchSchema, themeSchema } from "./theme.ts";
 
 // The newsletter plugin: the team's inbox for the next edition, the
@@ -445,10 +446,14 @@ export function createPlugin() {
           const stored = (await ctx.storage.themes.get(NEWSLETTER)) as StoredTheme | null;
           // Fields added to themes later are filled from the default.
           const theme = stored ? applyPatch(DEFAULT_THEME, stored.theme) : DEFAULT_THEME;
+          const media = publicMediaUrl();
           return {
             newsletter: NEWSLETTER,
             theme,
-            check: checkTheme(theme),
+            check: checkTheme(theme, media),
+            // Where sent emails load their images from: the images bucket's
+            // public address, or null for this site.
+            media,
             isDefault: !stored,
             updatedBy: stored?.updatedBy ?? null,
             updatedAt: stored?.updatedAt ?? null,
@@ -466,7 +471,7 @@ export function createPlugin() {
           const stored = (await ctx.storage.themes.get(NEWSLETTER)) as StoredTheme | null;
           const current = stored ? applyPatch(DEFAULT_THEME, stored.theme) : DEFAULT_THEME;
           const theme = themeSchema.parse(applyPatch(current, input.patch));
-          const check = checkTheme(theme);
+          const check = checkTheme(theme, publicMediaUrl());
           if (check.errors.length) return { saved: false, theme, check };
           await ctx.storage.themes.put(NEWSLETTER, {
             theme,

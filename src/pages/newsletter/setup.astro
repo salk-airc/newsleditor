@@ -2,6 +2,7 @@
 import { Role } from "@emdash-cms/auth";
 import Newsletter from "../../layouts/Newsletter.astro";
 import { canEdit, getSettings } from "../../lib/newsletter";
+import { publicMediaUrl } from "../../plugins/newsletter/media.ts";
 
 // First-run setup, after EmDash's own (which makes the first visitor an
 // Admin): the newsletter's name, sender, schedule and signature, a theme
@@ -24,6 +25,7 @@ const admin = user.role >= Role.ADMIN;
 const { settings, configured } = await getSettings();
 // What the server actually uses for images, from its environment.
 const storage = process.env.S3_BUCKET ? "bucket" : "local";
+const media = publicMediaUrl();
 const mcpUrl = new URL("/_emdash/api/mcp", Astro.url.origin).href;
 const days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 ---
@@ -152,21 +154,29 @@ const days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", 
               <input type="radio" name="images" value="local" />
               <span>
                 <strong>On this computer</strong> (the data/media folder). Simplest; fine for drafting. Readers' mail apps
-                can't load images from here, so before sending, check the README's “Sending” section.
+                can't load images from here, so before sending, check the README's “Images in sent emails”.
               </span>
             </label>
             <label class="setup__choice">
               <input type="radio" name="images" value="bucket" />
               <span>
                 <strong>In an S3-compatible bucket</strong> (AWS S3, Cloudflare R2, MinIO, Backblaze B2…) with a public
-                address, so every reader's mail app can load them.
+                address. Every image in a sent email then loads from there, the banner and logo included, so readers see
+                them even when this computer is off.
               </span>
             </label>
             <p class="setup__warning" data-storage-note role="status" hidden />
             <div class="setup__bucket" data-bucket hidden>
               {
-                storage === "bucket" ? (
-                  <p class="setup__ok">This server is already using a bucket ({process.env.S3_BUCKET}).</p>
+                storage === "bucket" && media ? (
+                  <p class="setup__ok">
+                    This server is already using a bucket ({process.env.S3_BUCKET}), read at {media}.
+                  </p>
+                ) : storage === "bucket" ? (
+                  <p class="setup__warning">
+                    This server is using a bucket ({process.env.S3_BUCKET}) but has no public address for it, so sent emails
+                    still load their images from this site. Set <code>S3_PUBLIC_URL</code> and restart it.
+                  </p>
                 ) : (
                   <>
                     <p class="setup__hint">

@@ -103,8 +103,8 @@ The [skill](.claude/skills/newsleditor/SKILL.md) in this repo tells Claude how t
 A pasted email keeps links to its images, and each reader's mail app loads them when the email is opened. That includes the banner, the coloured rules and the logo, which newsleditor draws or serves itself. So the images have to be at an address the readers' mail apps can reach:
 
 - **On a laptop** (`http://localhost:4321`) they aren't. That setup is for drafting and previewing. Some mail apps copy pasted images into the message itself, which would get around this; we haven't confirmed which Outlook versions do, so send yourself a test (and open it on a phone, off your network) before relying on it.
-- **On a server with a public address** (see below) they are, as long as the images at `/email/art/` and `/_emdash/api/media/file/` can be loaded without signing in, which is how newsleditor serves them.
-- **An S3-compatible bucket** (below) puts uploaded and pasted images at the bucket's public address. The banner, rules and logo still come from the site itself, so the site needs a public address for those too.
+- **On a server with a public address** (see below) they are, as long as the images at `/email/art/` and `/_emdash/api/media/file/` can be loaded without signing in, which is how newsleditor serves them. The server has to stay up for as long as anyone might open an old email.
+- **With an S3-compatible bucket that has a public address** (below), everything the copied email shows loads from the bucket: uploaded and pasted images, the logo, and the banner and rules, which newsleditor puts in the bucket (under `email-art/`) when an edition is opened in the studio. The site itself can then be anywhere, a laptop included, and switched off: sent emails don't need it.
 
 ## Hosting
 
@@ -147,7 +147,7 @@ Set `SITE_URL` to the public address.
 
 ### Postgres and buckets
 
-SQLite and the local `data/media` folder are fine for a team. To keep the data elsewhere, set `DATABASE_URL` for Postgres and the `S3_*` variables for any S3-compatible storage (AWS S3, Cloudflare R2, MinIO, Backblaze B2). The bucket needs public read access for its images to show in emails.
+SQLite and the local `data/media` folder are fine for a team. To keep the data elsewhere, set `DATABASE_URL` for Postgres and the `S3_*` variables for any S3-compatible storage (AWS S3, Cloudflare R2, MinIO, Backblaze B2). The bucket needs public read access, and `S3_PUBLIC_URL` set to the address it's read at, for its images to show in emails. The access key needs to read and write objects in that bucket only (on Cloudflare R2, an API token with Object Read & Write, limited to the one bucket).
 
 ## Why the email looks the way it does
 

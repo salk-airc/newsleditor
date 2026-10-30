@@ -31,6 +31,8 @@ export function startSetup(form: HTMLFormElement) {
   let savedTheme: Theme | null = null;
   /** The theme being worked on here (a logo changes it). */
   let theme: Theme = DEFAULT_THEME;
+  /** The images bucket's public address, where a logo may also be. */
+  let media: string | null = null;
   save.disabled = true;
 
   // ------------------------------------------------------------ the form --
@@ -75,7 +77,7 @@ export function startSetup(form: HTMLFormElement) {
   function render() {
     const draft = { ...settings, ...read(), sender: settings.sender } as Settings;
     const t = currentTheme();
-    showProblems(checkTheme(t));
+    showProblems(checkTheme(t, media));
     show(sampleEmail(t, draft));
   }
 
@@ -185,7 +187,7 @@ export function startSetup(form: HTMLFormElement) {
           patch: settingsPatch,
         });
         if (!result.saved) {
-          showProblems(checkTheme(currentTheme()), result.errors);
+          showProblems(checkTheme(currentTheme(), media), result.errors);
           throw new Error(result.errors[0] ?? "check the settings");
         }
         Object.assign(settings, result.settings);
@@ -251,9 +253,10 @@ export function startSetup(form: HTMLFormElement) {
 
   fill(settings);
   showStorage();
-  plugin<{ theme: Theme }>("theme-get", {})
+  plugin<{ theme: Theme; media: string | null }>("theme-get", {})
     .then((r) => {
       savedTheme = theme = r.theme;
+      media = r.media;
       save.disabled = false;
       if (theme.logo) {
         logoImg.src = theme.logo;

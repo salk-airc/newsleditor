@@ -56,6 +56,8 @@ export function startThemeEditor(root: HTMLElement) {
   let saved: Theme = DEFAULT_THEME;
   let theme: Theme = DEFAULT_THEME;
   let settings: Settings = DEFAULT_SETTINGS;
+  /** The images bucket's public address, where a logo may also be. */
+  let media: string | null = null;
   // The form stays locked until the saved theme has loaded: typing earlier
   // would be wiped when it arrives, and saving without it would write the
   // defaults over the real theme.
@@ -111,7 +113,7 @@ export function startThemeEditor(root: HTMLElement) {
     const bad = (Object.keys(theme.colors) as ColorKey[]).filter((k) => !validHex(theme.colors[k]));
     const check: ThemeCheck = bad.length
       ? { errors: bad.map((k) => `${k}: “${theme.colors[k]}” isn't a 6-digit hex colour like #3557a0.`), warnings: [] }
-      : checkTheme(theme);
+      : checkTheme(theme, media);
     showProblems(check);
     const changed = Object.keys(changes()).length > 0;
     save.disabled = !loaded || !changed || check.errors.length > 0;
@@ -221,9 +223,10 @@ export function startThemeEditor(root: HTMLElement) {
     .catch(() => {
       // The preview just goes without the signature.
     });
-  plugin<{ theme: Theme; updatedBy: string | null; updatedAt: string | null }>("theme-get", {})
+  plugin<{ theme: Theme; media: string | null; updatedBy: string | null; updatedAt: string | null }>("theme-get", {})
     .then((r) => {
       saved = theme = r.theme;
+      media = r.media;
       loaded = true;
       fieldsets.forEach((f) => (f.disabled = false));
       fill(theme);
