@@ -78,7 +78,10 @@ node_ok() {
 }
 if ! node_ok; then
   say "Getting Node.js"
-  version="$(curl -fsSL https://nodejs.org/dist/index.tab | awk -F'\t' -v arch="osx-$NODE_ARCH-tar" -v max="$MAX_NODE_MAJOR" '
+  # Read in full first: awk stops at the first match, and curl writing into a
+  # closed pipe would fail the install (pipefail).
+  index_tab="$(curl -fsSL https://nodejs.org/dist/index.tab)" || fail "Couldn't reach nodejs.org."
+  version="$(printf '%s\n' "$index_tab" | awk -F'\t' -v arch="osx-$NODE_ARCH-tar" -v max="$MAX_NODE_MAJOR" '
     NR > 1 && $10 != "-" && $1 ~ /^v[0-9]+\.[0-9]+\.[0-9]+$/ && index($3, arch) {
       split(substr($1, 2), v, ".")
       if ((v[1] > 22 || (v[1] == 22 && v[2] >= 18)) && v[1] <= max) { print $1; exit }
