@@ -8,13 +8,12 @@ How Salk AIRC runs newsleditor for Salk teams lives in other repos. They're Salk
 
 | Repo | What it is | How newsleditor uses it |
 |---|---|---|
-| [salk-airc/salk-signin](https://github.com/salk-airc/salk-signin) (private) | Salk sign-in at `https://signin.salk.sh`: an OpenID Connect provider in front of the "AIRC Sign-in" Microsoft Entra app, for any AIRC service | A newsletter's `OIDC_*` settings point at it ("Sign in with Salk", `src/auth/oidc.ts`). Its `scripts/register-client.sh` registers a newsletter and prints those settings |
+| [salk-airc/hosting](https://github.com/salk-airc/hosting) (private) | How AIRC hosts apps for Salk teams: `signin/` (Sign in with Salk at `https://signin.salk.sh`), `tunnel/` (Quick Tunnels), and `site/`, the one front page where teams ask for an app (next) | A newsletter's `OIDC_*` settings point at `signin/` ("Sign in with Salk", `src/auth/oidc.ts`). newsleditor's setup on the front page (what the form asks, what approving creates, its setup code) is `site/apps/newsleditor.ts` there, not here |
 | [salk-airc/airc-landing](https://github.com/salk-airc/airc-landing) (private) | AIRC's own site, with the "News & Vibes" studio newsleditor was generalised from (Cloudflare Workers, D1, R2, Durable Objects) | Reference only: don't change it for newsleditor |
-| salk-tunnel (not in a repo yet) | Salk Quick Tunnel: `cloudflared` from a lab machine to `<name>-t.salk.sh`, behind Cloudflare Access | A newsletter on a lab machine gets a tunnel like these, but at `<name>-news.salk.sh` without Access (sign-in is salk-signin's) |
 
 How the Salk pieces fit, for a team that runs its newsletter on its own computer:
 
-- **Address:** a Cloudflare tunnel to `https://<name>-news.salk.sh`.
-- **Sign-in:** salk-signin; the newsletter's Admin invites its writers (EmDash's Users > Invite), and nobody else gets in.
+- **Address:** a Cloudflare tunnel to `https://<name>-news.salk.sh` (outbound only; not the `-t` Quick Tunnels, which put Cloudflare Access in front).
+- **Sign-in:** hosting's `signin/`; the newsletter's Admin invites its writers (EmDash's Users > Invite), and nobody else gets in.
 - **Images in sent emails:** a public R2 bucket per newsletter (`S3_*`, with `S3_PUBLIC_URL`), so they load when the computer is off.
-- Still to come: the `newsleditor.salk.sh` front page (requests, approved in Slack) and the installers that take one setup code.
+- **Setup code:** hosting's front page hands a team one code with all of the above; newsleditor's installer (still to come, and generic: any setup code works) takes it.
