@@ -52,6 +52,16 @@ $MinNode = [version]"22.18.0"
 $MaxNodeMajor = 26
 
 function Say($text) { Write-Host ""; Write-Host $text -ForegroundColor Cyan }
+# Runs a program (npm, node, cloudflared), judged by its exit code alone. Windows
+# PowerShell 5.1 turns anything a program writes to stderr into an error when
+# output is redirected, and with $ErrorActionPreference = "Stop" a notice from npm
+# would end the install.
+function Invoke-Program([string]$exe) {
+  $before = $ErrorActionPreference
+  $ErrorActionPreference = "Continue"
+  try { & $exe @args 2>&1 | ForEach-Object { Write-Host "$_" } } finally { $ErrorActionPreference = $before }
+  return $LASTEXITCODE
+}
 function Fail($text) {
   Write-Host ""; Write-Host $text -ForegroundColor Red
   if (-not $NoGui) { Read-Host "Press Enter to close" | Out-Null }
@@ -199,10 +209,9 @@ $url = ((Get-Content $Config) | Where-Object { $_ -like "SITE_URL=*" }) -replace
 Say "Installing and building newsleditor (a few minutes)"
 Push-Location $AppDir
 try {
-  & $npm ci --no-audit --no-fund --loglevel=error
-  if ($LASTEXITCODE) { Fail "Installing newsleditor's packages failed (see $DataRoot\install.log)." }
-  & $node (Join-Path $AppDir "node_modules\astro\bin\astro.mjs") build
-  if ($LASTEXITCODE) { Fail "Building newsleditor failed (see $DataRoot\install.log)." }
+  $env:npm_config_update_notifier = "false"
+  if ((Invoke-Program $npm ci --no-audit --no-fund --loglevel=error) -ne 0) { Fail "Installing newsleditor's packages failed (see $DataRoot\install.log)." }
+  if ((Invoke-Program $node (Join-Path $AppDir "node_modules\astro\bin\astro.mjs") build) -ne 0) { Fail "Building newsleditor failed (see $DataRoot\install.log)." }
 } finally { Pop-Location }
 
 # ------------------------------------------------------------- the tunnel --
@@ -219,9 +228,8 @@ if ($code -and $code.tunnelToken) {
     if (-not $cf) { Fail "Installing cloudflared failed." }
   }
   # One tunnel service per computer: replace one from an earlier code.
-  if (Get-Service -Name cloudflared -ErrorAction SilentlyContinue) { & $cf service uninstall | Out-Null; Start-Sleep -Seconds 2 }
-  & $cf service install $code.tunnelToken
-  if ($LASTEXITCODE) { Fail "Connecting the tunnel failed (see $DataRoot\install.log)." }
+  if (Get-Service -Name cloudflared -ErrorAction SilentlyContinue) { Invoke-Program $cf service uninstall | Out-Null; Start-Sleep -Seconds 2 }
+  if ((Invoke-Program $cf service install $code.tunnelToken) -ne 0) { Fail "Connecting the tunnel failed (see $DataRoot\install.log)." }
 }
 
 # ------------------------------------------------------- start at boot --
