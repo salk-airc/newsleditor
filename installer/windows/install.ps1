@@ -243,5 +243,5 @@ Say "Done: newsleditor is running at $open"
 Write-Host "It starts by itself when this computer does. Keep the computer on: that's where the newsletter lives."
 Write-Host "To update it later, run the installer again and leave the setup code empty."
 Stop-Transcript | Out-Null
-Start-Process $open
+try { Start-Process $open } catch { }   # no desktop (a remote session): nothing to open it in
 if (-not $NoGui) { Read-Host "Press Enter to close" | Out-Null }
