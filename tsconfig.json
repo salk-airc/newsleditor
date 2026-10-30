@@ -1,7 +1,7 @@
 {
   "extends": "astro/tsconfigs/strict",
   "include": [".astro/types.d.ts", "emdash-env.d.ts", "**/*"],
-  "exclude": ["dist", "data"],
+  "exclude": ["dist", "data", "src/worker.ts", "src/worker/edition-room.ts"],
   "compilerOptions": {
     "allowImportingTsExtensions": true,
     "types": ["node"]
