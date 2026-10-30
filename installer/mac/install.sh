@@ -78,14 +78,14 @@ node_ok() {
 }
 if ! node_ok; then
   say "Getting Node.js"
-  # Read in full first: awk stops at the first match, and curl writing into a
-  # closed pipe would fail the install (pipefail).
+  # Read in full, then searched without a pipe: awk stops at the first match,
+  # and whatever was writing into the pipe would fail the install (pipefail).
   index_tab="$(curl -fsSL https://nodejs.org/dist/index.tab)" || fail "Couldn't reach nodejs.org."
-  version="$(printf '%s\n' "$index_tab" | awk -F'\t' -v arch="osx-$NODE_ARCH-tar" -v max="$MAX_NODE_MAJOR" '
+  version="$(awk -F'\t' -v arch="osx-$NODE_ARCH-tar" -v max="$MAX_NODE_MAJOR" '
     NR > 1 && $10 != "-" && $1 ~ /^v[0-9]+\.[0-9]+\.[0-9]+$/ && index($3, arch) {
       split(substr($1, 2), v, ".")
       if ((v[1] > 22 || (v[1] == 22 && v[2] >= 18)) && v[1] <= max) { print $1; exit }
-    }')"
+    }' <<< "$index_tab")"
   [[ -n "$version" ]] || fail "Couldn't find a Node.js release to install."
   name="node-$version-darwin-$NODE_ARCH"
   tmp="$(mktemp -d)"
@@ -109,7 +109,7 @@ launchctl bootout "gui/$uid/$LABEL.app" 2>/dev/null || true
 tmp="$(mktemp -d)"
 if [[ -f "$SOURCE" ]]; then cp "$SOURCE" "$tmp/app.tar.gz"; else curl -fsSL "$SOURCE" -o "$tmp/app.tar.gz"; fi
 tar -xzf "$tmp/app.tar.gz" -C "$tmp"
-inner="$(find "$tmp" -mindepth 1 -maxdepth 1 -type d | head -1)"
+inner="$(find "$tmp" -mindepth 1 -maxdepth 1 -type d -print -quit)"
 [[ -f "$inner/package.json" ]] || fail "That download isn't newsleditor."
 rm -rf "$APP_DIR"
 mv "$inner" "$APP_DIR"
