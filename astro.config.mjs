@@ -26,11 +26,18 @@ import { createRooms, dataDir } from "./src/rooms/server.ts";
 
 if (existsSync(".env")) process.loadEnvFile(".env");
 const data = dataDir();
-const pluginsDir = fileURLToPath(new URL("./src/plugins/", import.meta.url));
+
+// Paths handed to EmDash, with forward slashes. It writes some into generated
+// code unescaped (`import … from "${entrypoint}"`), where a Windows path's
+// backslashes vanish ("C:\Program Files\newsleditor" → "C:Program Files" and a
+// newline); forward slashes work everywhere, Windows included.
+const slashes = (/** @type {string} */ path) => path.replaceAll("\\", "/");
+const here = (/** @type {string} */ rel) => slashes(fileURLToPath(new URL(rel, import.meta.url)));
+const pluginsDir = here("./src/plugins/");
 
 const database = process.env.DATABASE_URL
   ? postgres({ connectionString: process.env.DATABASE_URL })
-  : sqlite({ url: `file:${join(data, "newsletter.db")}` });
+  : sqlite({ url: `file:${slashes(join(data, "newsletter.db"))}` });
 
 const storage = process.env.S3_BUCKET
   ? s3()
@@ -38,7 +45,7 @@ const storage = process.env.S3_BUCKET
 
 // Sign-in with an OpenID Connect provider, alongside passkeys, when OIDC_ISSUER
 // is set (src/auth/oidc.ts; the client's id and secret are read when it runs).
-const auth = (/** @type {string} */ path) => fileURLToPath(new URL(`./src/auth/${path}`, import.meta.url));
+const auth = (/** @type {string} */ path) => here(`./src/auth/${path}`);
 const oidcLabel = process.env.OIDC_LABEL || "your organisation";
 const authProviders = process.env.OIDC_ISSUER
   ? [
@@ -122,7 +129,7 @@ export default defineConfig({
           version: "0.1.0",
           // Absolute path: EmDash imports this from a generated virtual
           // module, where a relative specifier would not resolve.
-          entrypoint: fileURLToPath(new URL("./src/plugins/newsletter/index.ts", import.meta.url)),
+          entrypoint: here("./src/plugins/newsletter/index.ts"),
         },
       ],
     }),
