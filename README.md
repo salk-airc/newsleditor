@@ -15,7 +15,15 @@ It's built on [Astro](https://astro.build) and [EmDash](https://emdashcms.com), 
 
 **On Windows, with a setup code** (from whoever hosts newsletters for your organisation): download [`installer/windows/Install newsleditor.cmd`](installer/windows/), double-click it, choose **Yes** to let it make changes, and paste the code. It installs Node.js and newsleditor, connects the address in the code, makes newsleditor start with the computer, and opens it. Run it again later, with the code box empty, to update. See [Setup codes](#setup-codes).
 
-On a Mac or Linux, paste this into a terminal:
+**On a Mac, with a setup code:** paste this into Terminal (or double-click [`installer/mac/Install newsleditor.command`](installer/mac/); if macOS says it's from an unidentified developer, right-click it and choose **Open**), then paste the code into the window that appears:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/salk-airc/newsleditor/main/installer/mac/install.sh | bash
+```
+
+It needs no admin password: Node.js, newsleditor, cloudflared and the newsletter's data all go in `~/Library/Application Support/newsleditor`, and it runs while you're logged in (it starts at login, and restarts if it stops). Keep that Mac logged in, and set it not to sleep while your team writes. Run it again to update; `installer/mac/uninstall.sh` removes it.
+
+**Without a setup code**, on a Mac or Linux, paste this into a terminal:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/salk-airc/newsleditor/main/install.sh | bash
@@ -143,7 +151,7 @@ Changing these takes a restart. The database and storage settings are built into
 
 ### Setup codes
 
-An organisation that hosts newsletters for its teams can hand each one a single **setup code** instead of a list of settings. The Windows installer takes it. A code is `setup1.` followed by base64url-encoded JSON:
+An organisation that hosts newsletters for its teams can hand each one a single **setup code** instead of a list of settings. The Windows and Mac installers take it. A code is `setup1.` followed by base64url-encoded JSON:
 
 ```json
 {
