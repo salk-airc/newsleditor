@@ -137,8 +137,10 @@ if (-not $have -or $have -lt $MinNode -or $have.Major -gt $MaxNodeMajor) {
   Say "Getting Node.js"
   $release = (Invoke-RestMethod "https://nodejs.org/dist/index.json") |
     Where-Object {
-      $v = [version]$_.version.TrimStart("v")
-      $_.lts -and $_.files -contains "win-x64-zip" -and $v -ge $MinNode -and $v.Major -le $MaxNodeMajor
+      # LTS releases only, checked before the version is read: the list also has
+      # pre-releases ("v27.0.0-alpha…"), which aren't plain version numbers.
+      $_.lts -and $_.version -match '^v\d+\.\d+\.\d+$' -and $_.files -contains "win-x64-zip" -and
+        [version]$_.version.TrimStart("v") -ge $MinNode -and ([version]$_.version.TrimStart("v")).Major -le $MaxNodeMajor
     } |
     Select-Object -First 1
   if (-not $release) { Fail "Couldn't find a Node.js release to install." }
