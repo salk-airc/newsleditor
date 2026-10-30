@@ -1,0 +1,34 @@
+// newsleditor on Cloudflare (README, "On Cloudflare"). Copy this to
+// wrangler.jsonc, fill in the names, and build with NEWSLEDITOR_TARGET=cloudflare.
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "newsleditor",
+  // The Worker: Astro's handler and the Durable Object class (src/worker.ts).
+  "main": "./src/worker.ts",
+  "compatibility_date": "2026-09-28",
+  // nodejs_compat also fills process.env from vars and secrets, which the
+  // app reads its settings from.
+  "compatibility_flags": ["nodejs_compat"],
+  "observability": { "enabled": true },
+  // Your address, as a Workers custom domain. Leave out to use workers.dev.
+  // "routes": [{ "pattern": "news.example.org", "custom_domain": true }],
+
+  // The newsletter: EmDash's database. `wrangler d1 create newsleditor`.
+  "d1_databases": [{ "binding": "DB", "database_name": "newsleditor", "database_id": "<id from wrangler d1 create>" }],
+  // Images, public at MEDIA_PUBLIC_URL (an R2 custom domain or r2.dev) so sent
+  // emails can load them. `wrangler r2 bucket create newsleditor-media`.
+  "r2_buckets": [{ "binding": "MEDIA", "bucket_name": "newsleditor-media" }],
+  // Astro's sessions.
+  "kv_namespaces": [{ "binding": "SESSION", "id": "<id from wrangler kv namespace create newsleditor-sessions>" }],
+  // Each edition's live document while people edit it.
+  "durable_objects": { "bindings": [{ "name": "EDITION_ROOM", "class_name": "EditionRoom" }] },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["EditionRoom"] }],
+
+  "vars": {
+    "SITE_URL": "https://news.example.org",
+    "MEDIA_PUBLIC_URL": "https://media.news.example.org"
+    // Sign in with your organisation (README): OIDC_ISSUER, OIDC_LABEL,
+    // OIDC_FIRST_ADMIN here, and the client's id and secret as secrets:
+    // `wrangler secret put OIDC_CLIENT_ID`, `wrangler secret put OIDC_CLIENT_SECRET`.
+  }
+}
