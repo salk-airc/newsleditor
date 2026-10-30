@@ -18,6 +18,9 @@ import { createRooms, dataDir } from "./src/rooms/server.ts";
 //   the data/media folder, served by this site.
 // - DATA_DIR: the data folder. Default: ./data.
 // - SITE_URL: the address people reach the site at, when it isn't localhost.
+// - OIDC_ISSUER (with OIDC_CLIENT_ID, OIDC_CLIENT_SECRET, OIDC_LABEL,
+//   OIDC_FIRST_ADMIN): sign-in with an OpenID Connect provider as well as
+//   passkeys. See src/auth/oidc.ts.
 //
 // A .env file next to package.json sets any of them.
 
@@ -32,6 +35,25 @@ const database = process.env.DATABASE_URL
 const storage = process.env.S3_BUCKET
   ? s3()
   : local({ directory: join(data, "media"), baseUrl: "/_emdash/api/media/file" });
+
+// Sign-in with an OpenID Connect provider, alongside passkeys, when OIDC_ISSUER
+// is set (src/auth/oidc.ts; the client's id and secret are read when it runs).
+const auth = (/** @type {string} */ path) => fileURLToPath(new URL(`./src/auth/${path}`, import.meta.url));
+const oidcLabel = process.env.OIDC_LABEL || "your organisation";
+const authProviders = process.env.OIDC_ISSUER
+  ? [
+      {
+        id: "oidc",
+        label: oidcLabel,
+        adminEntry: auth("oidc-admin.tsx"),
+        routes: [
+          { pattern: "/_emdash/api/auth/oidc/login", entrypoint: auth("oidc-login.ts") },
+          { pattern: "/_emdash/api/auth/oidc/callback", entrypoint: auth("oidc-callback.ts") },
+        ],
+        publicRoutes: ["/_emdash/api/auth/oidc/"],
+      },
+    ]
+  : [];
 
 // EmDash builds its plugin list once when the dev server starts and keeps it,
 // so a hot-reloaded plugin file never replaces the running copy. Restart the
@@ -90,6 +112,7 @@ export default defineConfig({
     emdash({
       database,
       storage,
+      authProviders,
       // An edition's body is markdown rendered to one block of HTML, edited in
       // the studio at /newsletter/edit rather than on the page.
       toolbar: false,
@@ -111,6 +134,7 @@ export default defineConfig({
 
   vite: {
     plugins: [restartOnPluginChange(), editionRooms()],
+    define: { "import.meta.env.NEWSLEDITOR_OIDC_LABEL": JSON.stringify(oidcLabel) },
     environments: {
       ssr: { optimizeDeps: { include: ["marked"] } },
     },
