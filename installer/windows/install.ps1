@@ -2,7 +2,7 @@
   Installs newsleditor on a Windows computer from a setup code, or updates it.
 
   Double-click "Install newsleditor.cmd" (next to this file), or run:
-    powershell -ExecutionPolicy Bypass -File install.ps1 [-SetupCode setup1.…] [-Source <zip>]
+    powershell -ExecutionPolicy Bypass -File install.ps1 [-SetupCode setup1.… | -Update] [-Source <zip>] [-NoGui]
 
   1. Asks for administrator rights once (it installs a service and a startup task).
   2. Asks for the setup code, in a small window. Run again without a new code
@@ -30,6 +30,8 @@
 [CmdletBinding()]
 param(
   [string]$SetupCode,
+  # Update without asking: keep the settings from the last setup code.
+  [switch]$Update,
   [string]$Source = "https://codeload.github.com/salk-airc/newsleditor/zip/refs/heads/main",
   [switch]$NoGui
 )
@@ -78,6 +80,7 @@ if (-not $isAdmin) {
   # never on a command line.
   $relaunch = @("-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "`"$PSCommandPath`"", "-Source", "`"$Source`"")
   if ($NoGui) { $relaunch += "-NoGui" }
+  if ($Update) { $relaunch += "-Update" }
   try { Start-Process powershell -Verb RunAs -ArgumentList $relaunch | Out-Null } catch { Fail "newsleditor needs administrator rights to install. Run it again and choose Yes." }
   exit 0
 }
@@ -120,7 +123,8 @@ function ConvertFrom-SetupCode([string]$text) {
 }
 
 $haveConfig = Test-Path $Config
-if (-not $SetupCode) {
+if ($Update -and -not $haveConfig) { Fail "There's nothing to update: install it with a setup code first." }
+if (-not $SetupCode -and -not $Update) {
   $SetupCode = if ($NoGui) {
     Read-Host ($(if ($haveConfig) { "Setup code (Enter to keep the current settings)" } else { "Setup code" }))
   } else { Read-SetupCodeWindow $haveConfig }
