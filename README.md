@@ -13,7 +13,15 @@ It's built on [Astro](https://astro.build) and [EmDash](https://emdashcms.com), 
 
 ## Quickstart
 
-You need [Node.js](https://nodejs.org) 22.18 or newer.
+On a Mac or Linux, paste this into a terminal:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/salk-airc/newsleditor/main/install.sh | bash
+```
+
+It checks for git and [Node.js](https://nodejs.org) 22.18 or newer (installing Node with [Homebrew](https://brew.sh) if you have it), downloads newsleditor into `~/newsleditor`, installs it, starts it and opens **http://localhost:4321**. Run it again later to update. `NEWSLEDITOR_DIR` installs somewhere else, `PORT` picks another port, and `NO_START=1` installs without starting.
+
+Or by hand, with Node.js 22.18 or newer:
 
 ```bash
 git clone https://github.com/salk-airc/newsleditor.git
