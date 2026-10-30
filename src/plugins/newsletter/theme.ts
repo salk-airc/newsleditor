@@ -176,7 +176,8 @@ export interface ThemeCheck {
   warnings: string[];
 }
 
-export function checkTheme(theme: Theme): ThemeCheck {
+/** media: the images bucket's public address, when there is one (src/lib/bucket.ts); a logo may be there too. */
+export function checkTheme(theme: Theme, media?: string | null): ThemeCheck {
   const { page, ink, muted, accent, accent2 } = theme.colors;
   const errors: string[] = [];
   const warnings: string[] = [];
@@ -205,10 +206,10 @@ export function checkTheme(theme: Theme): ThemeCheck {
   for (const [label, c] of [["accent", accent], ["second accent", accent2]] as const)
     if (contrast(c, DARK) < 1.6)
       warnings.push(`The ${label} (${c}) is very dark: in phone dark mode the rules drawn in it will barely show on the dark background.`);
-  // Site paths only: an image from another site would tell that site who
-  // opened the email.
-  if (theme.logo && !/^\/(?!\/)/.test(theme.logo))
-    errors.push("The logo must be an image on this site: upload it (a path like /_emdash/api/media/file/...), not a link to another site.");
+  // Site paths or the images bucket only: an image from another site would
+  // tell that site who opened the email.
+  if (theme.logo && !/^\/(?!\/)/.test(theme.logo) && !(media && theme.logo.startsWith(`${media}/`)))
+    errors.push("The logo must be an image uploaded here (a path like /_emdash/api/media/file/...), not a link to another site.");
   if (theme.logo && /\.svg(\?|$)/i.test(theme.logo))
     warnings.push("The logo is an SVG, which Gmail and Outlook don't show: it will be missing in most inboxes. Upload a PNG instead.");
   return { errors, warnings };
@@ -218,14 +219,38 @@ export function checkTheme(theme: Theme): ThemeCheck {
 
 const bare = (c: string) => c.slice(1).toLowerCase();
 
+/** One drawing in a theme's email: colours as 6-digit hex without "#". */
+export type ArtSpec = { kind: "glow"; a: string; b: string; strength: number } | { kind: "rule"; a: string; b: string };
+
+/** The drawings a theme's email shows: the rule, and the glow unless the banner is off. */
+export function artSpecs(theme: Theme): ArtSpec[] {
+  const [a, b] = [bare(theme.colors.accent), bare(theme.colors.accent2)];
+  const rule: ArtSpec = { kind: "rule", a, b };
+  return theme.banner.style === "none" ? [rule] : [{ kind: "glow", a, b, strength: theme.banner.strength }, rule];
+}
+
+/** A drawing's key in the images bucket. It names everything drawn, so what's there never changes. */
+export function artKey(spec: ArtSpec): string {
+  return spec.kind === "glow"
+    ? `email-art/glow-${spec.a}-${spec.b}-${spec.strength}.png`
+    : `email-art/rule-${spec.a}-${spec.b}.png`;
+}
+
+// A drawing's address: in the images bucket when there is one (media, its
+// public address; see src/lib/bucket.ts), else drawn by this site at base.
+function artUrl(spec: ArtSpec, base: string, media?: string | null): string {
+  if (media) return `${media}/${artKey(spec)}`;
+  const q = `a=${spec.a}&b=${spec.b}`;
+  return spec.kind === "glow" ? `${base}/email/art/glow.png?${q}&s=${spec.strength}` : `${base}/email/art/rule.png?${q}`;
+}
+
 /** The glow banner image for a theme, or null when it has none. Its URL says everything it draws, so it never changes. */
-export function bannerUrl(theme: Theme, base: string): string | null {
-  if (theme.banner.style === "none") return null;
-  const { accent, accent2 } = theme.colors;
-  return `${base}/email/art/glow.png?a=${bare(accent)}&b=${bare(accent2)}&s=${theme.banner.strength}`;
+export function bannerUrl(theme: Theme, base: string, media?: string | null): string | null {
+  const glow = artSpecs(theme).find((spec) => spec.kind === "glow");
+  return glow ? artUrl(glow, base, media) : null;
 }
 
 /** The accent-to-accent2 rule image. */
-export function ruleUrl(theme: Theme, base: string): string {
-  return `${base}/email/art/rule.png?a=${bare(theme.colors.accent)}&b=${bare(theme.colors.accent2)}`;
+export function ruleUrl(theme: Theme, base: string, media?: string | null): string {
+  return artUrl(artSpecs(theme).find((spec) => spec.kind === "rule")!, base, media);
 }

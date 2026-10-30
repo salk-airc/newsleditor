@@ -41,6 +41,8 @@ export interface RenderDesignedEmailOptions {
   resolveImage?: (src: string) => string;
   /** The site that serves the logo, the art and media paths: its public address, which the studio uses for previews too. */
   site: string;
+  /** The images bucket's public address, when the banner and rules are kept there (src/lib/bucket.ts); else the site draws them. */
+  media?: string | null;
   /** The signature in markdown (the newsletter's setting); false or empty for none. */
   signature?: string | false;
 }
@@ -62,6 +64,7 @@ interface Style {
   frames: Record<Frame, string | null>;
   ruleImg: (width: number) => string;
   site: string;
+  media: string | null;
 }
 
 /** An image frame's colour in a theme (null: no frame). Solid colours: the accents at ~30% on white, and a stone grey. */
@@ -70,9 +73,9 @@ export function frameColors(theme: Theme): Record<Frame, string | null> {
   return { accent: mix(accent, "#ffffff", 0.3), accent2: mix(accent2, "#ffffff", 0.3), grey: "#dcd8cf", none: null };
 }
 
-function style(theme: Theme, site: string): Style {
+function style(theme: Theme, site: string, media: string | null): Style {
   const { page, ink, muted, rule, accent, accent2 } = theme.colors;
-  const ruleSrc = ruleUrl(theme, site);
+  const ruleSrc = ruleUrl(theme, site, media);
   return {
     theme,
     font: `font-family:${FONTS[theme.font].stack}`,
@@ -92,12 +95,13 @@ function style(theme: Theme, site: string): Style {
       `<img alt="" src="${escapeAttr(ruleSrc)}" width="${width}" height="3" ` +
       `style="display:block; width:${width}px; height:3px; border:0">`,
     site,
+    media,
   };
 }
 
 export function renderDesignedEmail(markdown: string, options: RenderDesignedEmailOptions): string {
   const resolveImage = options.resolveImage ?? ((src) => src);
-  const s = style(options.theme ?? DEFAULT_THEME, options.site);
+  const s = style(options.theme ?? DEFAULT_THEME, options.site, options.media ?? null);
   const P = `${s.font}; font-size:16px; line-height:1.7; color:${s.ink}; margin:0 0 18px`;
   const md = new Marked();
 
@@ -183,7 +187,7 @@ export function renderDesignedEmail(markdown: string, options: RenderDesignedEma
   const column = (padding: string, inner: string) =>
     `<table cellpadding="0" cellspacing="0" role="presentation" style="width:100%; max-width:640px">` +
     `<tr><td style="padding:${padding}">${inner}</td></tr></table>`;
-  const banner = bannerUrl(s.theme, s.site);
+  const banner = bannerUrl(s.theme, s.site, s.media);
   const fontLink = FONTS[s.theme.font].link;
 
   return (
@@ -224,7 +228,8 @@ function masthead(s: Style, options: RenderDesignedEmailOptions, sections: strin
   const { theme } = s;
   // No date given: whatever follows " — " in "Field Notes — Oct 2, 2026".
   const date = options.date ?? (title.split(/\s+—\s+/)[1] ?? "").replace(/\s*Edition\s*$/i, "");
-  const logo = theme.logo ? new URL(theme.logo, s.site).href : null;
+  // Through resolveImage like the body's images, so it loads from the same place.
+  const logo = theme.logo ? new URL((options.resolveImage ?? ((src) => src))(theme.logo), s.site).href : null;
   const tagline = theme.tagline.split(/\n/).map(escapeHtml).join("<br>");
 
   const lockup =

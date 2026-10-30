@@ -286,6 +286,11 @@ export async function startEditor(root: HTMLElement): Promise<void> {
   // (loadTheme, below).
   let theme: Theme = DEFAULT_THEME;
   let settings: Settings = DEFAULT_SETTINGS;
+  // The images bucket's public address, when there is one: the copied email
+  // loads everything from there, not from this site (src/lib/bucket.ts).
+  // artReady settles once the theme's banner and rules are in it.
+  let media: string | null = null;
+  let artReady: Promise<boolean> = Promise.resolve(false);
 
   interface ImageRef {
     from: number;
@@ -519,9 +524,21 @@ export async function startEditor(root: HTMLElement): Promise<void> {
 
   // ------------------------------------------------------------- preview --
 
-  const resolveImage = (src: string) => new URL(src, location.origin).href;
+  // Uploads are at /_emdash/api/media/file/<key> on this site, which reads
+  // them from the bucket when there is one; the email loads them from the
+  // bucket's own address instead, so they still load when this site doesn't.
+  const MEDIA_PATH = "/_emdash/api/media/file/";
+  const resolveImage = (src: string) => {
+    const url = new URL(src, location.origin);
+    if (media && url.origin === location.origin && url.pathname.startsWith(MEDIA_PATH))
+      return `${media}/${url.pathname.slice(MEDIA_PATH.length)}`;
+    return url.href;
+  };
 
-  function rendered(v: Exclude<View, "inbox">): string {
+  // sending: the email as copied, with the banner and rules from the bucket
+  // (once they're there). The preview has the site draw them, so it never
+  // waits on the bucket.
+  function rendered(v: Exclude<View, "inbox">, sending: { art: boolean } = { art: false }): string {
     if (v === "email") {
       const date = /^\d{4}-\d{2}-\d{2}$/.test(slug) ? formatDate(new Date(`${slug}T12:00:00.000Z`)) : undefined;
       return renderDesignedEmail(text("body"), {
@@ -530,6 +547,7 @@ export async function startEditor(root: HTMLElement): Promise<void> {
         theme,
         resolveImage,
         site: location.origin,
+        media: sending.art ? media : null,
         signature: settings.signature,
       });
     }
@@ -901,10 +919,17 @@ export async function startEditor(root: HTMLElement): Promise<void> {
 
   async function loadTheme() {
     try {
-      [theme, settings] = await Promise.all([
-        plugin<{ theme: Theme }>("theme-get", {}).then((r) => r.theme),
+      let saved: { theme: Theme; media: string | null };
+      [saved, settings] = await Promise.all([
+        plugin<{ theme: Theme; media: string | null }>("theme-get", {}),
         plugin<{ settings: Settings }>("settings-get", {}).then((r) => r.settings),
       ]);
+      ({ theme, media } = saved);
+      if (media)
+        artReady = fetch("/newsletter/art", { method: "POST" }).then(
+          (r) => r.ok,
+          () => false,
+        );
       paintSwatches();
       render();
     } catch {
@@ -975,7 +1000,11 @@ export async function startEditor(root: HTMLElement): Promise<void> {
   // or the Slack composer: the rendered <body>, without the page around it.
   copyButton.addEventListener("click", async () => {
     if (view === "inbox" || (view === "slack" && !text("slack").trim())) return;
-    const page = new DOMParser().parseFromString(rendered(view), "text/html");
+    // Started when the edition opened, so this is normally already settled.
+    const art = view === "email" && (await artReady);
+    if (view === "email" && media && !art)
+      setStatus("The banner and rules couldn't be put in the images bucket, so the copy loads them from this site", "error");
+    const page = new DOMParser().parseFromString(rendered(view, { art }), "text/html");
     const walker = page.createTreeWalker(page.body, NodeFilter.SHOW_COMMENT);
     const comments: Node[] = [];
     while (walker.nextNode()) comments.push(walker.currentNode);
