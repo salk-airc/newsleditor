@@ -200,4 +200,6 @@ open_url="${url:-http://localhost:$PORT}"
 say "Done: newsleditor is running at $open_url"
 echo "It starts by itself when you log in to this Mac. Keep this Mac on and awake while your team writes: that's where the newsletter lives."
 echo "To update it later, run the installer again and leave the setup code empty."
+# With sign-in through an organisation, straight to it: that's how the Admin gets in.
+grep -q '^OIDC_ISSUER=' "$CONFIG" && open_url="$open_url/_emdash/api/auth/oidc/login?next=/newsletter/edit"
 [[ -n "${NEWSLEDITOR_NO_OPEN:-}" ]] || open "$open_url"
