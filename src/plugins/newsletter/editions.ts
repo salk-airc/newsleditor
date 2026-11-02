@@ -10,7 +10,7 @@ export function formatDate(date: Date): string {
   return date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" });
 }
 
-/** The edition's subject line, from the settings' subject format: "Field Notes — Oct 30, 2026". */
+/** The edition's subject line, from the settings' subject: "Field Notes — Oct 30, 2026". */
 export function editionTitle(settings: Settings, date: Date): string {
   return settings.subject.replaceAll("{name}", settings.name).replaceAll("{date}", formatDate(date));
 }

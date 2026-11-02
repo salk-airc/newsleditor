@@ -1,3 +1,4 @@
+import { editionTitle } from "../plugins/newsletter/editions.ts";
 import type { Settings, SettingsPatch } from "../plugins/newsletter/settings.ts";
 import { checkTheme, DEFAULT_THEME, type Theme, type ThemeCheck, themeChanges } from "../plugins/newsletter/theme.ts";
 import { plugin, uploadImage } from "./emdash-api.ts";
@@ -22,6 +23,10 @@ export function startSetup(form: HTMLFormElement) {
   const swatches = $<HTMLElement>("[data-swatches]");
   const bucket = $<HTMLElement>("[data-bucket]");
   const storageNote = $<HTMLElement>("[data-storage-note]");
+  const subjectPreview = $<HTMLElement>("[data-subject-preview]");
+  // The setup code (or whoever runs the server) already put images in a
+  // public bucket: no choice to make.
+  const storageReady = form.dataset.storageReady === "1";
 
   /** The settings as last saved. */
   const settings = JSON.parse(form.dataset.settings!) as Settings;
@@ -39,7 +44,13 @@ export function startSetup(form: HTMLFormElement) {
 
   function fill(s: Settings) {
     field("name").value = configured ? s.name : "";
-    field("subject").value = s.subject;
+    // The subject as a box and a checkbox (read() puts them back): "Field
+    // Notes — {date}" is "Field Notes", ticked. An empty box is the name, so a
+    // new newsletter starts with one rather than a template.
+    const dated = s.subject.endsWith(" — {date}");
+    const box = dated ? s.subject.slice(0, -" — {date}".length) : s.subject;
+    field("subject").value = box === "{name}" ? "" : box;
+    (field("subjectDate") as HTMLInputElement).checked = s.subject.includes("{date}");
     field("senderName").value = s.sender.name;
     field("senderEmail").value = s.sender.email;
     field("weekday").value = s.weekday === null ? "" : String(s.weekday);
@@ -47,16 +58,20 @@ export function startSetup(form: HTMLFormElement) {
     field("signature").value = s.signature;
     field("starter").value = s.starter;
     field("voice").value = s.voice;
-    const images = form.querySelector<HTMLInputElement>(`input[name="images"][value="${s.images}"]`);
+    const choice = storageReady ? "bucket" : s.images;
+    const images = form.querySelector<HTMLInputElement>(`input[name="images"][value="${choice}"]`);
     if (images) images.checked = true;
-    bucket.hidden = s.images !== "bucket";
+    bucket.hidden = storageReady || choice !== "bucket";
   }
+
+  /** The subject from the box and the checkbox. A box with {date} in it already says where the date goes. */
+  const subjectFrom = (box: string, addDate: boolean) => (addDate && !box.includes("{date}") ? `${box} — {date}` : box);
 
   function read(): SettingsPatch {
     const weekday = field("weekday").value;
     return {
       name: field("name").value.trim(),
-      subject: field("subject").value.trim(),
+      subject: subjectFrom(field("subject").value.trim() || "{name}", (field("subjectDate") as HTMLInputElement).checked),
       sender: { name: field("senderName").value.trim(), email: field("senderEmail").value.trim() },
       weekday: weekday === "" ? null : Number(weekday),
       timeZone: field("timeZone").value.trim(),
@@ -76,6 +91,7 @@ export function startSetup(form: HTMLFormElement) {
 
   function render() {
     const draft = { ...settings, ...read(), sender: settings.sender } as Settings;
+    subjectPreview.textContent = `An edition's subject will read: ${editionTitle({ ...draft, name: draft.name || "Your newsletter" }, new Date())}`;
     const t = currentTheme();
     showProblems(checkTheme(t, media));
     show(sampleEmail(t, draft));
@@ -110,7 +126,7 @@ export function startSetup(form: HTMLFormElement) {
   function showStorage() {
     const chosen = form.querySelector<HTMLInputElement>('input[name="images"]:checked')?.value;
     const actual = form.dataset.storage;
-    storageNote.hidden = !chosen || chosen === actual;
+    storageNote.hidden = storageReady || !chosen || chosen === actual;
     storageNote.textContent =
       actual === "bucket"
         ? "This server stores images in a bucket (S3_BUCKET is set), whatever is chosen here."

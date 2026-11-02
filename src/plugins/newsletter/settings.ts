@@ -12,7 +12,8 @@ export const settingsSchema = z.object({
   name: z.string().min(1).max(80),
   /**
    * Every edition's subject line. {name} is the name, {date} the edition's
-   * date ("Oct 2, 2026").
+   * date ("Oct 2, 2026"). The setup page writes it from a box and an "Add the
+   * edition's date" checkbox: "Field Notes — {date}".
    */
   subject: z.string().min(1).max(160),
   /** The day of the week editions go out, 0 Sunday to 6 Saturday, or null for no fixed day. */
@@ -76,8 +77,6 @@ export function applySettingsPatch(settings: Settings, patch: SettingsPatch): Se
 /** Problems that keep settings from being saved. */
 export function checkSettings(settings: Settings): string[] {
   const errors: string[] = [];
-  if (!settings.subject.includes("{date}"))
-    errors.push('The subject needs {date} in it, so every edition gets its own subject line: like "{name} — {date}".');
   try {
     new Intl.DateTimeFormat("en-US", { timeZone: settings.timeZone });
   } catch {

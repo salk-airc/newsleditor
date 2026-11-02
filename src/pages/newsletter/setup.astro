@@ -26,6 +26,9 @@ const { settings, configured } = await getSettings();
 // What the server actually uses for images, from its environment.
 const storage = process.env.S3_BUCKET ? "bucket" : "local";
 const media = publicMediaUrl();
+// Images already in a public bucket (a setup code, or whoever runs the
+// server, set it up): nothing to choose, just say so.
+const storageReady = storage === "bucket" && !!media;
 const mcpUrl = new URL("/_emdash/api/mcp", Astro.url.origin).href;
 const days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 ---
@@ -43,6 +46,7 @@ const days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", 
           data-admin={admin ? "1" : ""}
           data-mcp-url={mcpUrl}
           data-storage={storage}
+          data-storage-ready={storageReady ? "1" : ""}
         >
           {!configured && (
             <p class="setup__intro prose">
@@ -61,12 +65,13 @@ const days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", 
             </label>
             <label>
               Subject line
-              <input name="subject" required maxlength="160" />
-              <span class="setup__hint">
-                {"{name}"} is the name and {"{date}"} the edition's date: “{"{name}"} — {"{date}"}” becomes “Field Notes —
-                Oct 30, 2026”.
-              </span>
+              <input name="subject" maxlength="140" placeholder="Same as its name" />
             </label>
+            <label class="setup__choice">
+              <input type="checkbox" name="subjectDate" checked />
+              <span>Add the edition's date</span>
+            </label>
+            <p class="setup__hint" data-subject-preview aria-live="polite"></p>
             <div class="setup__row">
               <label>
                 Sent by (name)
@@ -150,14 +155,21 @@ const days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", 
             <legend>
               <span class="setup__step">4</span> Where images live
             </legend>
-            <label class="setup__choice">
+            {
+              storageReady && (
+                <p class="setup__ok">
+                  Images are stored online for you, so they show up in every inbox, even when this computer is off.
+                </p>
+              )
+            }
+            <label class="setup__choice" hidden={storageReady}>
               <input type="radio" name="images" value="local" />
               <span>
                 <strong>On this computer</strong> (the data/media folder). Simplest; fine for drafting. Readers' mail apps
                 can't load images from here, so before sending, check the README's “Images in sent emails”.
               </span>
             </label>
-            <label class="setup__choice">
+            <label class="setup__choice" hidden={storageReady}>
               <input type="radio" name="images" value="bucket" />
               <span>
                 <strong>In an S3-compatible bucket</strong> (AWS S3, Cloudflare R2, MinIO, Backblaze B2…) with a public
@@ -409,6 +421,9 @@ S3_PUBLIC_URL=https://media.example.org`}
     align-items: start;
     gap: 0.6rem;
     font-weight: 400;
+  }
+  .setup__choice[hidden] {
+    display: none;
   }
 
   .setup__choice input {
