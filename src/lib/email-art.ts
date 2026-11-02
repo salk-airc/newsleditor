@@ -1,8 +1,8 @@
 import { encodePng } from "./png.ts";
 
-// The art in a newsletter email, drawn as PNGs from a theme's colours (see
+// The art in a newsletter email, drawn as PNGs from a theme's colors (see
 // bannerUrl and ruleUrl in src/plugins/newsletter/theme.ts): images are the
-// one kind of colour that survives Outlook on the web and phone dark modes.
+// one kind of color that survives Outlook on the web and phone dark modes.
 
 type RGB = [number, number, number];
 
@@ -16,7 +16,7 @@ const smooth = (edge: number, x: number) => {
 };
 
 export interface GlowArt {
-  /** Colours as 6-digit hex without "#". */
+  /** Colors as 6-digit hex without "#". */
   a: string;
   b: string;
   /** 0..100 */
@@ -31,8 +31,8 @@ export const GLOW = { width: 640, height: 100 };
  * Two soft glows, the accent near the top left and the second accent near the
  * top right, on a transparent background, faded out at the sides and the
  * bottom so the band has no visible edges. Transparent rather than drawn on
- * the page colour: dark modes darken the page but never recolour images, so a
- * band with the page colour in it would stay a light box there.
+ * the page color: dark modes darken the page but never recolor images, so a
+ * band with the page color in it would stay a light box there.
  */
 export function drawGlow({ a, b, strength }: GlowArt): Promise<Uint8Array<ArrayBuffer>> {
   const [A, B] = [rgb(a), rgb(b)];
@@ -46,7 +46,7 @@ export function drawGlow({ a, b, strength }: GlowArt): Promise<Uint8Array<ArrayB
     const fade = smooth(W * 0.18, x) * smooth(W * 0.18, W - x) * smooth(H * 0.75, H - y);
     const ta = max * fade * glow(x, y, W * 0.3, W * 0.42, H * 1.6);
     const tb = max * fade * glow(x, y, W * 0.72, W * 0.38, H * 1.4);
-    // b over a, each at its own opacity, as one colour and one opacity.
+    // b over a, each at its own opacity, as one color and one opacity.
     const alpha = 1 - (1 - ta) * (1 - tb);
     if (alpha === 0) return [0, 0, 0, 0];
     const px = [0, 1, 2].map((i) => Math.round((A[i]! * ta * (1 - tb) + B[i]! * tb) / alpha));

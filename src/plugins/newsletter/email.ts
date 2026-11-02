@@ -92,7 +92,7 @@ function imagesOnly(token: Token): Tokens.Image[] | null {
 // into one array, so they render as a single side-by-side row.
 /**
  * The frames an image can have in the designed email, in the newsletter
- * theme's colours: its accent (the default), its second accent, grey or none.
+ * theme's colors: its accent (the default), its second accent, grey or none.
  */
 export const FRAMES = ["accent", "accent2", "grey", "none"] as const;
 export type Frame = (typeof FRAMES)[number];

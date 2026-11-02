@@ -1,6 +1,6 @@
 ---
 name: newsleditor
-description: Set up and run newsleditor, a self-hosted studio for writing an email newsletter together, connect Claude Code to it, and work on the newsletter through its MCP tools - drafting editions in the newsletter's own voice, filing links for the next edition, and changing its theme. Use for "help me set up newsleditor", "start the next edition", "draft this week's newsletter", "add this to the newsletter", "what's in the newsletter inbox?", or "change the newsletter's colours/logo".
+description: Set up and run newsleditor, a self-hosted studio for writing an email newsletter together, connect Claude Code to it, and work on the newsletter through its MCP tools - drafting editions in the newsletter's own voice, filing links for the next edition, and changing its theme. Use for "help me set up newsleditor", "start the next edition", "draft this week's newsletter", "add this to the newsletter", "what's in the newsletter inbox?", or "change the newsletter's colors/logo".
 ---
 
 # newsleditor
@@ -17,7 +17,7 @@ Do the steps in order. Run commands yourself where you can; the user has to do a
 2. **Get the code**, if the user isn't already in a clone: `git clone https://github.com/salk-airc/newsleditor.git`, then work in that folder.
 3. **Install**: `npm install`.
 4. **Start**: `npm start` (builds on first run, then serves at http://localhost:4321). Run it in the background or ask the user to run it in a terminal they keep open; it has to keep running.
-5. **First visit** (the user, in a browser): open http://localhost:4321. EmDash's setup asks for a site title and makes their account with a passkey; the first person becomes the Admin. Then the newsletter's setup asks for its name, sender, schedule, signature, logo (for the colours), voice, and where images live.
+5. **First visit** (the user, in a browser): open http://localhost:4321. EmDash's setup asks for a site title and makes their account with a passkey; the first person becomes the Admin. Then the newsletter's setup asks for its name, sender, schedule, signature, logo (for the colors), voice, and where images live.
    - Help with the **voice** if they want: ask how the newsletter should sound, words they use or avoid, how long sections run, and write that up in their words. Don't invent a voice for them.
    - If they plan to send from a laptop, point them to the README's "Images in sent emails" section: readers' mail apps can't load images from `localhost`.
 6. **Connect Claude**: on the Settings page (`/newsletter/setup`), step 5, an Admin makes a connection and gets a `claude mcp add …` command to run in a terminal. Or run `npm run connect-claude` (needs `ADMIN_TOKEN`, an admin API token, unless the server is `npm run dev`). Either way, a new Claude Code session is needed before the tools appear.
@@ -45,7 +45,7 @@ From the newsletter plugin (in Claude Code their names end in `newsletter__add_i
 | `list_items` | What's waiting in the inbox |
 | `next_edition` | The next edition's date, slug, subject, starter body, studio link and voice. Creates nothing |
 | `mark_used` | Taking the items a draft used out of the inbox |
-| `theme_get` / `theme_update` | The email's look: name, logo, colours, font, banner |
+| `theme_get` / `theme_update` | The email's look: name, logo, colors, font, banner |
 
 And EmDash's own tools: `content_create`, `content_get`, `content_update`, `content_list` (collection `editions`) and `media_upload`.
 
@@ -103,4 +103,4 @@ A paragraph or two. [Links](https://example.org) inline.
 
 ### Changing the theme
 
-Call `theme_get` first, then `theme_update` with only what changes. If `saved` is false, tell the user the errors and suggest a fix (usually a darker colour). Mention any warnings. A logo must be a PNG uploaded with `media_upload`, ideally transparent; SVGs and images from other sites don't work in email.
+Call `theme_get` first, then `theme_update` with only what changes. If `saved` is false, tell the user the errors and suggest a fix (usually a darker color). Mention any warnings. A logo must be a PNG uploaded with `media_upload`, ideally transparent; SVGs and images from other sites don't work in email.

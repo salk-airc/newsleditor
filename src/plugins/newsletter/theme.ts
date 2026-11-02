@@ -1,39 +1,54 @@
 import { z } from "zod";
 
-// A newsletter's look: its name, logo, colours, font and banner, as data that
+// A newsletter's look: its name, logo, colors, font and banner, as data that
 // the group running it edits (in the studio's Theme page, or by asking
 // Claude through the newsletter plugin's theme tools). The designed email
 // (email-designed.ts) renders from it. Pure: no EmDash, no I/O.
 //
-// What a theme can say is limited to what survives email: solid colours,
+// What a theme can say is limited to what survives email: solid colors,
 // near-black text and art drawn as images by the site (/email/art/), because
 // Outlook on the web drops CSS gradients from a pasted email and phone dark
-// modes recolour text but never images.
+// modes recolor text but never images.
 
 // No .transform(): these schemas also describe the MCP tools, as JSON Schema.
-const HEX = z.string().regex(/^#[0-9a-fA-F]{6}$/, "A colour is a 6-digit hex value like #3557a0");
+const HEX = z.string().regex(/^#[0-9a-fA-F]{6}$/, "A color is a 6-digit hex value like #3557a0");
+
+// Fonts the email can use. Web fonts (a Google Fonts link) show in Apple Mail
+// and on iPhones; Outlook and Gmail use the first font after them that the
+// reader has, named in `elsewhere`. The others are on most computers already.
+const APTOS = "Aptos,Aptos_EmbeddedFont,Aptos_MSFontService,Calibri,'Segoe UI',Helvetica,Arial,sans-serif";
+const GEORGIA = "Georgia,Cambria,'Times New Roman',Times,serif";
+type Font = { label: string; group: "Sans serif" | "Serif"; stack: string; link: string | null; elsewhere: string | null };
+const web = (family: string, weights: string, group: Font["group"], elsewhere: string, fallback: string): Font => ({
+  label: family,
+  group,
+  stack: `'${family}',${fallback}`,
+  link: `https://fonts.googleapis.com/css2?family=${family.replaceAll(" ", "+")}:wght@${weights}&display=swap`,
+  elsewhere,
+});
+const installed = (label: string, group: Font["group"], stack: string): Font => ({ label, group, stack, link: null, elsewhere: null });
 
 export const FONTS = {
-  geist: {
-    label: "Geist (web font, falls back to Aptos)",
-    stack: "Geist,Aptos,Aptos_EmbeddedFont,Aptos_MSFontService,Calibri,Helvetica,Arial,sans-serif",
-    link: "https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono&display=swap",
-  },
-  sans: {
-    label: "System sans (Aptos, Segoe UI, Helvetica)",
-    stack: "-apple-system,BlinkMacSystemFont,'Segoe UI',Aptos,Aptos_EmbeddedFont,Aptos_MSFontService,Calibri,Helvetica,Arial,sans-serif",
-    link: null,
-  },
-  serif: {
-    label: "Serif (Georgia)",
-    stack: "Georgia,Cambria,'Times New Roman',Times,serif",
-    link: null,
-  },
-} as const;
+  sans: installed("System", "Sans serif", `-apple-system,BlinkMacSystemFont,'Segoe UI',${APTOS}`),
+  geist: web("Geist", "400;500;600;700", "Sans serif", "Aptos", APTOS),
+  inter: web("Inter", "400;500;600;700", "Sans serif", "Aptos", APTOS),
+  plex: web("IBM Plex Sans", "400;500;600;700", "Sans serif", "Segoe UI", `'Segoe UI',${APTOS}`),
+  dmsans: web("DM Sans", "400;500;600;700", "Sans serif", "Aptos", APTOS),
+  worksans: web("Work Sans", "400;500;600;700", "Sans serif", "Aptos", APTOS),
+  nunito: web("Nunito", "400;600;700", "Sans serif", "Trebuchet MS", `'Trebuchet MS',${APTOS}`),
+  friendly: installed("Trebuchet MS", "Sans serif", `'Trebuchet MS','Lucida Grande',${APTOS}`),
+  wide: installed("Verdana", "Sans serif", "Verdana,Tahoma,Geneva,'Segoe UI',sans-serif"),
+  serif: installed("Georgia", "Serif", GEORGIA),
+  sourceserif: web("Source Serif 4", "400;600;700", "Serif", "Georgia", GEORGIA),
+  lora: web("Lora", "400;600;700", "Serif", "Georgia", GEORGIA),
+  merriweather: web("Merriweather", "400;700", "Serif", "Georgia", GEORGIA),
+  baskerville: web("Libre Baskerville", "400;700", "Serif", "Georgia", GEORGIA),
+  book: installed("Palatino", "Serif", "Palatino,'Palatino Linotype','Book Antiqua',Georgia,serif"),
+} satisfies Record<string, Font>;
 export type FontKey = keyof typeof FONTS;
 
 export const themeSchema = z.object({
-  /** The name in the masthead: lead in the text colour, tail in the accent ("Field Notes" + "from the Lab"). */
+  /** The name in the masthead: lead in the text color, tail in the accent ("Field Notes" + "from the Lab"). */
   nameLead: z.string().min(1).max(60),
   nameTail: z.string().max(40),
   /** Short word next to the logo ("lab"); empty for none. */
@@ -59,7 +74,7 @@ export const themeSchema = z.object({
     rule: HEX,
   }),
   font: z.enum(Object.keys(FONTS) as [FontKey, ...FontKey[]]),
-  /** The glow banner across the top, drawn as an image in the accent colours. */
+  /** The glow banner across the top, drawn as an image in the accent colors. */
   banner: z.object({
     style: z.enum(["glow", "none"]),
     /** 0 (faint) to 100 (strong). */
@@ -70,7 +85,7 @@ export const themeSchema = z.object({
 });
 export type Theme = z.infer<typeof themeSchema>;
 
-/** A change to a theme: any fields, colours and banner merged into the current ones. */
+/** A change to a theme: any fields, colors and banner merged into the current ones. */
 export const themePatchSchema = themeSchema
   .omit({ colors: true, banner: true })
   .partial()
@@ -105,6 +120,27 @@ export const DEFAULT_THEME: Theme = {
   rules: true,
 };
 
+/** Ready-made color sets for the Theme page, each readable by checkTheme. The first is the default. */
+export const PALETTES: { name: string; colors: Theme["colors"] }[] = [
+  { name: "Slate and teal", colors: DEFAULT_THEME.colors },
+  {
+    name: "Forest and gold",
+    colors: { page: "#f3f1e8", ink: "#1a1f1a", muted: "#5d6358", accent: "#2f6b45", accent2: "#c4932f", rule: "#e4e1d3" },
+  },
+  {
+    name: "Plum and coral",
+    colors: { page: "#f6f1ee", ink: "#1f1a24", muted: "#645c68", accent: "#6b3d8f", accent2: "#d0674f", rule: "#e9e1dc" },
+  },
+  {
+    name: "Red and orange",
+    colors: { page: "#f5f0e9", ink: "#221a16", muted: "#685d55", accent: "#b83a24", accent2: "#e8902a", rule: "#e9e0d6" },
+  },
+  {
+    name: "Raspberry and sky",
+    colors: { page: "#f3f1f2", ink: "#1f1a1e", muted: "#635b62", accent: "#b02a68", accent2: "#4a95cc", rule: "#e6e1e4" },
+  },
+];
+
 export function applyPatch(theme: Theme, patch: ThemePatch): Theme {
   return {
     ...theme,
@@ -117,7 +153,7 @@ export function applyPatch(theme: Theme, patch: ThemePatch): Theme {
 /**
  * The fields of next that differ from saved, as a patch. Saving only these
  * doesn't undo a change made meanwhile elsewhere (Claude, another editor) to
- * fields nobody touched. Colours compare without case.
+ * fields nobody touched. Colors compare without case.
  */
 export function themeChanges(saved: Theme, next: Theme): ThemePatch {
   const patch: Record<string, unknown> = {};
@@ -133,7 +169,7 @@ export function themeChanges(saved: Theme, next: Theme): ThemePatch {
   return patch as ThemePatch;
 }
 
-// ------------------------------------------------------------ colour math --
+// ------------------------------------------------------------ color math --
 
 type RGB = [number, number, number];
 
@@ -146,7 +182,7 @@ export function hex([r, g, b]: RGB): string {
   return `#${[r, g, b].map((v) => Math.round(v).toString(16).padStart(2, "0")).join("")}`;
 }
 
-/** a over b at opacity t (0..1), as a solid colour. */
+/** a over b at opacity t (0..1), as a solid color. */
 export function mix(a: string, b: string, t: number): string {
   const [x, y] = [rgb(a), rgb(b)];
   return hex([0, 1, 2].map((i) => x[i]! * t + y[i]! * (1 - t)) as RGB);
@@ -187,25 +223,25 @@ export function checkTheme(theme: Theme, media?: string | null): ThemeCheck {
   const ratio = (a: string, b: string) => contrast(a, b).toFixed(1);
 
   if (luminance(page) < 0.6)
-    errors.push(`The page colour ${page} is too dark: email clients and dark modes expect a light page. Pick a light colour.`);
+    errors.push(`The page color ${page} is too dark: email clients and dark modes expect a light page. Pick a light color.`);
   if (contrast(ink, page) < 4.5)
     errors.push(`Text (${ink}) on the page (${page}) is ${ratio(ink, page)}:1, below 4.5:1. Darken the text or lighten the page.`);
   else if (contrast(ink, page) < 7)
     warnings.push(`Text (${ink}) on the page (${page}) is ${ratio(ink, page)}:1; 7:1 or more reads better.`);
   if (luminance(ink) > 0.05)
     errors.push(
-      `Text colour ${ink} isn't dark enough for phones: dark modes turn near-black text near-white but leave lighter text grey. Use something near-black, like #1b1f27.`,
+      `Text color ${ink} isn't dark enough for phones: dark modes turn near-black text near-white but leave lighter text grey. Use something near-black, like #1b1f27.`,
     );
   if (contrast(muted, page) < 3)
     errors.push(`Muted text (${muted}) on the page is ${ratio(muted, page)}:1, below 3:1. Darken it.`);
   else if (contrast(muted, page) < 4.5)
     warnings.push(`Muted text (${muted}) on the page is ${ratio(muted, page)}:1; 4.5:1 or more reads better for small text.`);
   if (contrast(accent, page) < 3)
-    errors.push(`The accent (${accent}) on the page is ${ratio(accent, page)}:1, below 3:1: links and the name would be hard to read. Use a deeper colour.`);
+    errors.push(`The accent (${accent}) on the page is ${ratio(accent, page)}:1, below 3:1: links and the name would be hard to read. Use a deeper color.`);
   else if (contrast(accent, page) < 4.5)
     warnings.push(`The accent (${accent}) on the page is ${ratio(accent, page)}:1; links read better at 4.5:1 or more.`);
   if (contrast(accent2, page) < 1.8)
-    warnings.push(`The second accent (${accent2}) is close to the page colour, so the rules and the glow will barely show.`);
+    warnings.push(`The second accent (${accent2}) is close to the page color, so the rules and the glow will barely show.`);
   for (const [label, c] of [["accent", accent], ["second accent", accent2]] as const)
     if (contrast(c, DARK) < 1.6)
       warnings.push(`The ${label} (${c}) is very dark: in phone dark mode the rules drawn in it will barely show on the dark background.`);
@@ -222,7 +258,7 @@ export function checkTheme(theme: Theme, media?: string | null): ThemeCheck {
 
 const bare = (c: string) => c.slice(1).toLowerCase();
 
-/** One drawing in a theme's email: colours as 6-digit hex without "#". */
+/** One drawing in a theme's email: colors as 6-digit hex without "#". */
 export type ArtSpec = { kind: "glow"; a: string; b: string; strength: number } | { kind: "rule"; a: string; b: string };
 
 /** The drawings a theme's email shows: the glow unless the banner is off, and the rule unless the rules are. */

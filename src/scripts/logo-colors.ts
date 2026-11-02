@@ -1,13 +1,13 @@
 import { contrast, DEFAULT_THEME, hex, luminance, mix, rgb, type Theme } from "../plugins/newsletter/theme.ts";
 
-// Setup's "suggest a theme from your logo": the logo's two main colours,
+// Setup's "suggest a theme from your logo": the logo's two main colors,
 // made deep enough to read on the page as links (accent) and to show as
 // rules and glow (accent2). The result still goes through checkTheme before
 // it's saved, like any theme.
 
 type RGB = [number, number, number];
 
-/** The logo's main colours, most used first: saturated pixels only, so white, black and grey backgrounds don't count. */
+/** The logo's main colors, most used first: saturated pixels only, so white, black and grey backgrounds don't count. */
 export async function logoColors(src: string): Promise<string[]> {
   const img = new Image();
   img.crossOrigin = "anonymous";
@@ -22,7 +22,7 @@ export async function logoColors(src: string): Promise<string[]> {
   ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
   const { data } = ctx.getImageData(0, 0, canvas.width, canvas.height);
 
-  // Pixels bucketed by hue (24 buckets), each bucket keeping its average colour.
+  // Pixels bucketed by hue (24 buckets), each bucket keeping its average color.
   const buckets = new Map<number, { n: number; sum: RGB }>();
   for (let i = 0; i < data.length; i += 4) {
     const [r, g, b, a] = [data[i]!, data[i + 1]!, data[i + 2]!, data[i + 3]!];
@@ -39,7 +39,7 @@ export async function logoColors(src: string): Promise<string[]> {
   const colors: string[] = [];
   const hues: number[] = [];
   for (const [key, { n, sum }] of ranked) {
-    // Skip a hue right next to one already taken: it's the same colour, anti-aliased.
+    // Skip a hue right next to one already taken: it's the same color, anti-aliased.
     if (hues.some((h) => Math.min(Math.abs(h - key), 24 - Math.abs(h - key)) < 2)) continue;
     hues.push(key);
     colors.push(hex([sum[0] / n, sum[1] / n, sum[2] / n]));
@@ -48,7 +48,7 @@ export async function logoColors(src: string): Promise<string[]> {
   return colors;
 }
 
-/** A theme from a logo's colours: the first as the accent, the second (or a neighbour of the first) as accent2. */
+/** A theme from a logo's colors: the first as the accent, the second (or a neighbour of the first) as accent2. */
 export function themeFromColors(colors: string[], base: Theme = DEFAULT_THEME): Theme {
   const page = base.colors.page;
   if (!colors.length) return base;
@@ -58,11 +58,11 @@ export function themeFromColors(colors: string[], base: Theme = DEFAULT_THEME): 
   return { ...base, colors: { ...base.colors, accent, accent2 } };
 }
 
-/** The colour, darkened just enough to reach the contrast ratio on the page. */
+/** The color, darkened just enough to reach the contrast ratio on the page. */
 function deepen(color: string, page: string, ratio: number): string {
   let c = color;
   for (let k = 0.05; contrast(c, page) < ratio && k <= 0.9; k += 0.05) c = mix(color, "#000000", 1 - k);
-  // Very dark logo colours vanish in phone dark mode: lift them a little.
+  // Very dark logo colors vanish in phone dark mode: lift them a little.
   if (luminance(c) < 0.01) c = mix(c, "#ffffff", 0.85);
   return c;
 }

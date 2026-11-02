@@ -174,7 +174,7 @@ const noInput = z.object({});
 
 const themeUpdateInput = z.object({
   patch: themePatchSchema.describe(
-    "Only the fields to change; colors and banner merge into the current ones. Colours are 6-digit hex (#3557a0).",
+    "Only the fields to change; colors and banner merge into the current ones. Colors are 6-digit hex (#3557a0).",
   ),
 });
 
@@ -384,7 +384,10 @@ export function createPlugin() {
           const next = input.date
             ? { slug: input.date, date: new Date(`${input.date}T12:00:00.000Z`) }
             : nextOpenEditionDate(settings, new Set(editions.keys()));
-          const studio = new URL(`/newsletter/edit/${next.slug}`, ctx.site.url).href;
+          // The site's address: EmDash's setting, else SITE_URL; a bare path when neither is set.
+          const site = ctx.site.url || process.env.SITE_URL;
+          const path = `/newsletter/edit/${next.slug}`;
+          const studio = site ? new URL(path, site).href : path;
           return {
             slug: next.slug,
             exists: editions.has(next.slug),
@@ -576,7 +579,7 @@ export function createPlugin() {
         },
         theme_get: {
           description:
-            "The newsletter's theme: its name, logo, wordmark, tagline, footer, colours, font and glow banner, with any readability problems. Read it before changing the theme.",
+            "The newsletter's theme: its name, logo, wordmark, tagline, footer, colors, font and glow banner, with any readability problems. Read it before changing the theme.",
           route: "theme-get",
           input: noInput,
           output: themeGetOutput,

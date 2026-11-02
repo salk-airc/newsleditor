@@ -3,7 +3,7 @@ import { drawGlow, drawRule } from "../../../lib/email-art.ts";
 
 // /email/art/glow.png?a=3557a0&b=2f8f83&s=60 and
 // /email/art/rule.png?a=3557a0&b=2f8f83: a newsletter's banner and rules,
-// drawn from its theme's colours (bannerUrl and ruleUrl in
+// drawn from its theme's colors (bannerUrl and ruleUrl in
 // src/plugins/newsletter/theme.ts). Public, like everything under /email,
 // because sent emails load them.
 //
