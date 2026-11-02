@@ -65,11 +65,13 @@ const days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", 
             </label>
             <label>
               Subject line
-              <input name="subject" maxlength="160" placeholder="Same as its name" />
-              <span class="setup__hint" data-subject-preview>
-                Type it as it should read. Each edition's date goes after it.
-              </span>
+              <input name="subject" maxlength="140" placeholder="Same as its name" />
             </label>
+            <label class="setup__choice">
+              <input type="checkbox" name="subjectDate" checked />
+              <span>Add the edition's date</span>
+            </label>
+            <p class="setup__hint" data-subject-preview aria-live="polite"></p>
             <div class="setup__row">
               <label>
                 Sent by (name)

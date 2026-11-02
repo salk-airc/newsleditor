@@ -569,7 +569,7 @@ export function createPlugin() {
         },
         settings_update: {
           description:
-            "Change the newsletter's settings when the user asks: its name, subject (as it reads; the edition's date goes after it unless {date} places it, and {name} is the name), weekday (0 Sunday to 6 Saturday, or null), time zone, starter body ({day} placeholder), signature (markdown; images only from this site), sender, or voice notes. Pass only what changes. If there are errors nothing is saved: tell the user.",
+            "Change the newsletter's settings when the user asks: its name, subject format ({name} and {date} placeholders; include {date} unless the user wants the same subject every time), weekday (0 Sunday to 6 Saturday, or null), time zone, starter body ({day} placeholder), signature (markdown; images only from this site), sender, or voice notes. Pass only what changes. If there are errors nothing is saved: tell the user.",
           route: "settings-update",
           input: settingsUpdateInput,
           output: settingsUpdateOutput,

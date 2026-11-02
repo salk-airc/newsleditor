@@ -11,8 +11,9 @@ export const settingsSchema = z.object({
   /** The newsletter's name, as people say it: "Field Notes". */
   name: z.string().min(1).max(80),
   /**
-   * Every edition's subject line, as it reads: the edition's date ("Oct 2,
-   * 2026") goes after it, or where {date} is. {name} is the name.
+   * Every edition's subject line. {name} is the name, {date} the edition's
+   * date ("Oct 2, 2026"). The setup page writes it from a box and an "Add the
+   * edition's date" checkbox: "Field Notes — {date}".
    */
   subject: z.string().min(1).max(160),
   /** The day of the week editions go out, 0 Sunday to 6 Saturday, or null for no fixed day. */
