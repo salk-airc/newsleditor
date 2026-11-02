@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import node from "@astrojs/node";
 import react from "@astrojs/react";
-import { defineConfig } from "astro/config";
+import { defineConfig, sessionDrivers } from "astro/config";
 import emdash, { local, s3 } from "emdash/astro";
 import { postgres, sqlite } from "emdash/db";
 import { createRooms, dataDir } from "./src/rooms/server.ts";
@@ -108,6 +108,9 @@ function editionRooms() {
 export default defineConfig({
   site: process.env.SITE_URL,
   output: "server",
+  // Who's signed in, in the data folder. The Node adapter's default is inside
+  // node_modules, which an update (npm ci) replaces, signing everyone out.
+  session: { driver: sessionDrivers.fsLite({ base: join(data, "sessions") }) },
   // Standalone's handler (pages and static files), but server.mjs starts the
   // HTTP server itself (ASTRO_NODE_AUTOSTART=disabled), so it can take the
   // co-editing WebSockets too.
