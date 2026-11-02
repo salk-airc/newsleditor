@@ -24,9 +24,6 @@ export function startSetup(form: HTMLFormElement) {
   const bucket = $<HTMLElement>("[data-bucket]");
   const storageNote = $<HTMLElement>("[data-storage-note]");
   const subjectPreview = $<HTMLElement>("[data-subject-preview]");
-  // The setup code (or whoever runs the server) already put images in a
-  // public bucket: no choice to make.
-  const storageReady = form.dataset.storageReady === "1";
 
   /** The settings as last saved. */
   const settings = JSON.parse(form.dataset.settings!) as Settings;
@@ -58,10 +55,9 @@ export function startSetup(form: HTMLFormElement) {
     field("signature").value = s.signature;
     field("starter").value = s.starter;
     field("voice").value = s.voice;
-    const choice = storageReady ? "bucket" : s.images;
-    const images = form.querySelector<HTMLInputElement>(`input[name="images"][value="${choice}"]`);
+    const images = form.querySelector<HTMLInputElement>(`input[name="images"][value="${s.images}"]`);
     if (images) images.checked = true;
-    bucket.hidden = storageReady || choice !== "bucket";
+    bucket.hidden = s.images !== "bucket";
   }
 
   /** The subject from the box and the checkbox. A box with {date} in it already says where the date goes. */
@@ -126,7 +122,7 @@ export function startSetup(form: HTMLFormElement) {
   function showStorage() {
     const chosen = form.querySelector<HTMLInputElement>('input[name="images"]:checked')?.value;
     const actual = form.dataset.storage;
-    storageNote.hidden = storageReady || !chosen || chosen === actual;
+    storageNote.hidden = !chosen || chosen === actual;
     storageNote.textContent =
       actual === "bucket"
         ? "This server stores images in a bucket (S3_BUCKET is set), whatever is chosen here."
