@@ -60,8 +60,10 @@ if [[ -n "${NEWSLEDITOR_UPDATE:-}" ]]; then
 elif [[ -z "$code" ]]; then
   prompt="Paste the setup code you were given for this newsletter."
   [[ -n "$have_config" ]] && prompt="Paste a new setup code, or leave it empty to update newsleditor and keep its settings."
-  # The answer comes back on stdout; Cancel exits.
-  code="$(osascript -e "text returned of (display dialog \"$prompt\" default answer \"\" with title \"Install newsleditor\" buttons {\"Cancel\", \"Install\"} default button \"Install\")" 2>/dev/null)" ||
+  # The answer comes back on stdout; Cancel exits. Hidden: the box fills with
+  # dots, so a paste shows (a long code otherwise looks like nothing changed,
+  # and gets pasted twice) and the code's keys aren't on screen.
+  code="$(osascript -e "text returned of (display dialog \"$prompt\" default answer \"\" with hidden answer with title \"Install newsleditor\" buttons {\"Cancel\", \"Install\"} default button \"Install\")" 2>/dev/null)" ||
     { echo "Cancelled."; exit 0; }
 fi
 code="$(printf '%s' "$code" | tr -d '[:space:]')"
