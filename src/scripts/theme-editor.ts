@@ -72,6 +72,7 @@ export function startThemeEditor(root: HTMLElement) {
   const save = $<HTMLButtonElement>("[data-save]");
   const dark = $<HTMLInputElement>("[data-dark]");
   const subject = $<HTMLElement>("[data-subject]");
+  const accent = $<HTMLSelectElement>("[data-accent-words]");
   const logoImg = $<HTMLImageElement>("[data-logo-img]");
   const logoNone = $<HTMLElement>("[data-logo-none]");
   const text = (name: string) => form.elements.namedItem(name) as HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement;
@@ -92,7 +93,9 @@ export function startThemeEditor(root: HTMLElement) {
   // ---------------------------------------------------------- form <-> theme
 
   function fill(t: Theme) {
-    for (const name of ["nameLead", "nameTail", "footer", "wordmark", "tagline", "font"] as const) text(name).value = t[name];
+    text("name").value = t.nameTail ? `${t.nameLead} ${t.nameTail}` : t.nameLead;
+    accentChoices(words(t.nameTail).length);
+    for (const name of ["footer", "wordmark", "tagline", "font"] as const) text(name).value = t[name];
     for (const key of Object.keys(t.colors) as ColorKey[]) {
       $<HTMLInputElement>(`[data-color="${key}"]`).value = t.colors[key].toLowerCase();
       $<HTMLInputElement>(`[data-hex="${key}"]`).value = t.colors[key].toLowerCase();
@@ -106,10 +109,13 @@ export function startThemeEditor(root: HTMLElement) {
   function read(): Theme {
     const colors = { ...theme.colors };
     for (const key of Object.keys(colors) as ColorKey[]) colors[key] = $<HTMLInputElement>(`[data-hex="${key}"]`).value.trim();
+    // The name is typed once; the last few words chosen go in the accent.
+    const all = words(text("name").value);
+    const tail = Math.min(Number(accent.value) || 0, Math.max(all.length - 1, 0));
     return {
       ...theme,
-      nameLead: text("nameLead").value,
-      nameTail: text("nameTail").value,
+      nameLead: all.slice(0, all.length - tail).join(" "),
+      nameTail: all.slice(all.length - tail).join(" "),
       footer: text("footer").value,
       wordmark: text("wordmark").value,
       tagline: text("tagline").value,
@@ -121,6 +127,18 @@ export function startThemeEditor(root: HTMLElement) {
       },
       rules: $<HTMLInputElement>("[data-rules-on]").checked,
     };
+  }
+
+  const words = (s: string) => s.trim().split(/\s+/).filter(Boolean);
+
+  /** The accent menu: nothing, or the name's last word, last two words… (never all of it). */
+  function accentChoices(selected: number) {
+    const all = words(text("name").value);
+    const options = [new Option("Nothing", "0")];
+    for (let n = 1; n < all.length; n++) options.push(new Option(all.slice(all.length - n).join(" "), String(n)));
+    accent.replaceChildren(...options);
+    accent.value = String(Math.min(selected, all.length - 1, options.length - 1));
+    if (accent.selectedIndex < 0) accent.value = "0";
   }
 
   function showLogo(src: string | null) {
@@ -179,6 +197,8 @@ export function startThemeEditor(root: HTMLElement) {
 
   form.addEventListener("input", (e) => {
     const target = e.target as HTMLInputElement;
+    // The accent menu follows the name's words, keeping how many are chosen.
+    if (target.name === "name") accentChoices(Number(accent.value) || 0);
     // The swatch and the hex field follow each other.
     if (target.dataset.color) $<HTMLInputElement>(`[data-hex="${target.dataset.color}"]`).value = target.value;
     if (target.dataset.hex && validHex(target.value.trim()))

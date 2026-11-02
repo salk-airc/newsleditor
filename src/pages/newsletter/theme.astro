@@ -44,13 +44,16 @@ const colors = [
             <fieldset>
               <legend>Name</legend>
               <label>
-                Name <input name="nameLead" required maxlength="60" />
+                Name <input name="name" required maxlength="60" />
               </label>
               <label>
-                In the accent colour <input name="nameTail" maxlength="40" />
+                In the accent colour
+                <select data-accent-words />
+                <span class="theme__hint">The end of the name can stand out, like “Field <em>Notes</em>”.</span>
               </label>
               <label>
-                Footer line <input name="footer" maxlength="160" />
+                Footer line <input name="footer" maxlength="160" placeholder="The Lab · Salk Institute" />
+                <span class="theme__hint">Small print at the very bottom.</span>
               </label>
             </fieldset>
 
@@ -68,10 +71,12 @@ const colors = [
                 A transparent PNG works best; it's shown 40px tall. Not SVG: Gmail and Outlook don't show SVG images.
               </p>
               <label>
-                Wordmark <input name="wordmark" maxlength="24" />
+                Wordmark <input name="wordmark" maxlength="24" placeholder="LAB" />
+                <span class="theme__hint">A short word beside the logo, in the second accent.</span>
               </label>
               <label>
-                Tagline <textarea name="tagline" rows="2" maxlength="120" />
+                Tagline <textarea name="tagline" rows="2" maxlength="120" placeholder={"Salk Institute\nfor Biological Studies"} />
+                <span class="theme__hint">Beside the wordmark. A line break makes two lines.</span>
               </label>
             </fieldset>
 
