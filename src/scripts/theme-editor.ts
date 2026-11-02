@@ -71,6 +71,7 @@ export function startThemeEditor(root: HTMLElement) {
   const status = $<HTMLElement>("[data-status]");
   const save = $<HTMLButtonElement>("[data-save]");
   const dark = $<HTMLInputElement>("[data-dark]");
+  const subject = $<HTMLElement>("[data-subject]");
   const logoImg = $<HTMLImageElement>("[data-logo-img]");
   const logoNone = $<HTMLElement>("[data-logo-none]");
   const text = (name: string) => form.elements.namedItem(name) as HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement;
@@ -164,6 +165,8 @@ export function startThemeEditor(root: HTMLElement) {
   const art = drawnArt(() => render());
 
   function render() {
+    // The subject is the inbox's, not the email's: shown over the preview.
+    subject.textContent = `Subject: ${editionTitle(settings, nextEditionDate(settings))}`;
     let html = sampleEmail(theme, settings, undefined, art);
     // Images stay as they are in a dark mode: flip them back inside the
     // inverted frame.
