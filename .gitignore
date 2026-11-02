@@ -22,3 +22,8 @@ data/
 # logs
 *.log
 npm-debug.log*
+
+# Cloudflare: a deployment's own Wrangler config and local secrets (wrangler.example.jsonc is the template)
+wrangler.jsonc
+.dev.vars
+.wrangler/

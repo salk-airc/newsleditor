@@ -2,8 +2,10 @@
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
+import cloudflare from "@astrojs/cloudflare";
 import node from "@astrojs/node";
 import react from "@astrojs/react";
+import { d1, r2 } from "@emdash-cms/cloudflare";
 import { defineConfig } from "astro/config";
 import emdash, { local, s3 } from "emdash/astro";
 import { postgres, sqlite } from "emdash/db";
@@ -21,10 +23,16 @@ import { createRooms, dataDir } from "./src/rooms/server.ts";
 // - OIDC_ISSUER (with OIDC_CLIENT_ID, OIDC_CLIENT_SECRET, OIDC_LABEL,
 //   OIDC_FIRST_ADMIN): sign-in with an OpenID Connect provider as well as
 //   passkeys. See src/auth/oidc.ts.
+// - NEWSLEDITOR_TARGET=cloudflare: build for Cloudflare Workers instead of
+//   Node (README, "On Cloudflare"): the database in D1 (binding DB), images in
+//   R2 (binding MEDIA, public at MEDIA_PUBLIC_URL), and each edition's live
+//   document in a Durable Object (EDITION_ROOM, src/worker/edition-room.ts),
+//   from the Wrangler config in WRANGLER_CONFIG (default wrangler.jsonc).
 //
 // A .env file next to package.json sets any of them.
 
 if (existsSync(".env")) process.loadEnvFile(".env");
+const onCloudflare = process.env.NEWSLEDITOR_TARGET === "cloudflare";
 const data = dataDir();
 
 // Paths handed to EmDash, with forward slashes. It writes some into generated
@@ -35,13 +43,17 @@ const slashes = (/** @type {string} */ path) => path.replaceAll("\\", "/");
 const here = (/** @type {string} */ rel) => slashes(fileURLToPath(new URL(rel, import.meta.url)));
 const pluginsDir = here("./src/plugins/");
 
-const database = process.env.DATABASE_URL
-  ? postgres({ connectionString: process.env.DATABASE_URL })
-  : sqlite({ url: `file:${slashes(join(data, "newsletter.db"))}` });
+const database = onCloudflare
+  ? d1({ binding: "DB" })
+  : process.env.DATABASE_URL
+    ? postgres({ connectionString: process.env.DATABASE_URL })
+    : sqlite({ url: `file:${slashes(join(data, "newsletter.db"))}` });
 
-const storage = process.env.S3_BUCKET
-  ? s3()
-  : local({ directory: join(data, "media"), baseUrl: "/_emdash/api/media/file" });
+const storage = onCloudflare
+  ? r2({ binding: "MEDIA", publicUrl: process.env.MEDIA_PUBLIC_URL || undefined })
+  : process.env.S3_BUCKET
+    ? s3()
+    : local({ directory: join(data, "media"), baseUrl: "/_emdash/api/media/file" });
 
 // Sign-in with an OpenID Connect provider, alongside passkeys, when OIDC_ISSUER
 // is set (src/auth/oidc.ts; the client's id and secret are read when it runs).
@@ -108,10 +120,13 @@ function editionRooms() {
 export default defineConfig({
   site: process.env.SITE_URL,
   output: "server",
-  // Standalone's handler (pages and static files), but server.mjs starts the
-  // HTTP server itself (ASTRO_NODE_AUTOSTART=disabled), so it can take the
-  // co-editing WebSockets too.
-  adapter: node({ mode: "standalone" }),
+  // Node: standalone's handler (pages and static files), but server.mjs
+  // starts the HTTP server itself (ASTRO_NODE_AUTOSTART=disabled), so it can
+  // take the co-editing WebSockets too. Cloudflare: the Worker in
+  // src/worker.ts, configured by the Wrangler config.
+  adapter: onCloudflare
+    ? cloudflare({ imageService: "compile", configPath: process.env.WRANGLER_CONFIG || "wrangler.jsonc" })
+    : node({ mode: "standalone" }),
 
   integrations: [
     // React is required by EmDash's admin UI at /_emdash/admin.
@@ -140,8 +155,12 @@ export default defineConfig({
   server: { port: 4321, host: process.env.HOST ?? "localhost" },
 
   vite: {
-    plugins: [restartOnPluginChange(), editionRooms()],
+    // On Cloudflare the rooms are Durable Objects, not part of the dev server.
+    plugins: onCloudflare ? [restartOnPluginChange()] : [restartOnPluginChange(), editionRooms()],
     define: { "import.meta.env.NEWSLEDITOR_OIDC_LABEL": JSON.stringify(oidcLabel) },
+    // Code shared by both builds imports `env` from "cloudflare:workers" to find
+    // Cloudflare bindings; on Node it gets an empty one.
+    resolve: onCloudflare ? {} : { alias: { "cloudflare:workers": here("./src/worker/node-env.ts") } },
     environments: {
       ssr: { optimizeDeps: { include: ["marked"] } },
     },

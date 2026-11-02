@@ -196,6 +196,33 @@ Set `SITE_URL` to the public address.
 
 SQLite and the local `data/media` folder are fine for a team. To keep the data elsewhere, set `DATABASE_URL` for Postgres and the `S3_*` variables for any S3-compatible storage (AWS S3, Cloudflare R2, MinIO, Backblaze B2). The bucket needs public read access, and `S3_PUBLIC_URL` set to the address it's read at, for its images to show in emails. The access key needs to read and write objects in that bucket only (on Cloudflare R2, an API token with Object Read & Write, limited to the one bucket).
 
+### On Cloudflare
+
+newsleditor also runs on [Cloudflare Workers](https://developers.cloudflare.com/workers/), with no server to keep on: the newsletter in a D1 database, images in an R2 bucket, and each edition's live document in a Durable Object. It fits the free plan's size limit; the paid plan ($5 a month) lifts the free plan's per-request CPU limit and its 10 databases.
+
+1. Make the database, the images bucket and a namespace for sessions, and give the bucket a public address (an R2 custom domain, or its r2.dev address) so sent emails can load the images:
+
+   ```bash
+   npx wrangler d1 create newsleditor
+   ```
+
+   ```bash
+   npx wrangler r2 bucket create newsleditor-media
+   ```
+
+   ```bash
+   npx wrangler kv namespace create newsleditor-sessions
+   ```
+
+2. Copy `wrangler.example.jsonc` to `wrangler.jsonc` and fill in the ids, your address (`routes`, `SITE_URL`) and the bucket's public address (`MEDIA_PUBLIC_URL`). For [sign-in with your organisation](#sign-in-with-your-organisation), add `OIDC_ISSUER` and the rest to `vars`, and the client's id and secret as secrets (`npx wrangler secret put OIDC_CLIENT_SECRET`).
+3. Build and deploy. The database and storage settings, and whether there's a sign-in button, are built in, so the build needs the same `MEDIA_PUBLIC_URL` (and `OIDC_ISSUER`, `OIDC_LABEL`) in its environment as `wrangler.jsonc` has:
+
+   ```bash
+   MEDIA_PUBLIC_URL=https://media.news.example.org npm run deploy:cloudflare
+   ```
+
+`WRANGLER_CONFIG` builds from another Wrangler config than `wrangler.jsonc`, to deploy several newsletters from one checkout.
+
 ## Why the email looks the way it does
 
 Every choice in the designed email comes from something a real inbox did to an earlier version:
