@@ -1,11 +1,11 @@
-import { editionTitle, nextOpenEditionDate, starterBody } from "../plugins/newsletter/editions.ts";
+import { editionTitle, starterBody } from "../plugins/newsletter/editions.ts";
 import type { Settings, SettingsPatch } from "../plugins/newsletter/settings.ts";
 import { checkTheme, DEFAULT_THEME, type Theme, type ThemeCheck, themeChanges } from "../plugins/newsletter/theme.ts";
 import { plugin, uploadImage } from "./emdash-api.ts";
 import { logoColors, themeFromColors } from "./logo-colors.ts";
 import { drawnArt } from "./preview-art.ts";
 import { previewFrame } from "./preview-frame.ts";
-import { sampleEmail } from "./theme-editor.ts";
+import { nextEditionDate, sampleEmail } from "./theme-editor.ts";
 
 // The setup and Settings page (src/pages/newsletter/setup.astro): fills the
 // form from the saved settings, previews the email as the name, signature and
@@ -94,13 +94,7 @@ export function startSetup(form: HTMLFormElement) {
   function render() {
     const draft = { ...settings, ...read(), sender: settings.sender } as Settings;
     const named = { ...draft, name: draft.name || "Your newsletter" };
-    let date: Date;
-    try {
-      date = nextOpenEditionDate(named, new Set()).date;
-    } catch {
-      // A time zone that's still being typed.
-      date = new Date(`${new Date().toISOString().slice(0, 10)}T12:00:00.000Z`);
-    }
+    const date = nextEditionDate(named);
     subjectPreview.textContent = `The next edition's subject will read: ${editionTitle(named, date)}`;
     const t = currentTheme();
     showProblems(checkTheme(t, media));

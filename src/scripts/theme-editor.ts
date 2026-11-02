@@ -1,4 +1,4 @@
-import { editionTitle, formatDate } from "../plugins/newsletter/editions.ts";
+import { editionTitle, formatDate, nextOpenEditionDate } from "../plugins/newsletter/editions.ts";
 import { renderDesignedEmail } from "../plugins/newsletter/email-designed.ts";
 import { DEFAULT_SETTINGS, type Settings } from "../plugins/newsletter/settings.ts";
 import { checkTheme, DEFAULT_THEME, type DrawnArt, type Theme, type ThemeCheck, themeChanges } from "../plugins/newsletter/theme.ts";
@@ -31,9 +31,19 @@ A paragraph with a [link to something](https://example.com), **bold text** and a
 See you next time!
 `;
 
+/** The next edition's date, or today's while the time zone is still being typed. */
+export function nextEditionDate(settings: Settings): Date {
+  try {
+    return nextOpenEditionDate(settings, new Set()).date;
+  } catch {
+    return new Date(`${new Date().toISOString().slice(0, 10)}T12:00:00.000Z`);
+  }
+}
+
 /**
- * An edition as an email in a theme, with the newsletter's signature: the
- * sample text, or an edition's body and date (setup shows the starter text).
+ * An edition as an email in a theme, with the newsletter's signature and the
+ * next edition's subject and date: the sample text, or an edition's body and
+ * date (setup shows the starter text).
  */
 export function sampleEmail(
   theme: Theme,
@@ -41,9 +51,10 @@ export function sampleEmail(
   edition?: { body: string; date: Date },
   drawn?: DrawnArt,
 ): string {
+  const date = edition?.date ?? nextEditionDate(settings);
   return renderDesignedEmail(edition?.body ?? SAMPLE, {
-    title: edition ? editionTitle(settings, edition.date) : settings.name,
-    date: edition ? formatDate(edition.date) : new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
+    title: editionTitle(settings, date),
+    date: formatDate(date),
     theme,
     site: location.origin,
     drawn,
