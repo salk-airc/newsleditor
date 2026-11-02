@@ -10,9 +10,14 @@ export function formatDate(date: Date): string {
   return date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" });
 }
 
-/** The edition's subject line, from the settings' subject format: "Field Notes — Oct 30, 2026". */
+/**
+ * The edition's subject line, from the settings' subject: "Field Notes — Oct 30, 2026".
+ * People type it as it reads ("Field Notes"); the edition's date goes after it,
+ * unless {date} says where. {name} is the newsletter's name.
+ */
 export function editionTitle(settings: Settings, date: Date): string {
-  return settings.subject.replaceAll("{name}", settings.name).replaceAll("{date}", formatDate(date));
+  const subject = settings.subject.includes("{date}") ? settings.subject : `${settings.subject} — {date}`;
+  return subject.replaceAll("{name}", settings.name).replaceAll("{date}", formatDate(date));
 }
 
 /** "Monday", for a weekday number (Jan 7, 2024 was a Sunday); null with no fixed day. */
