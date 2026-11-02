@@ -1,9 +1,9 @@
 ---
 import Newsletter from "../../layouts/Newsletter.astro";
 import { canEdit } from "../../lib/newsletter";
-import { FONTS } from "../../plugins/newsletter/theme.ts";
+import { FONTS, PALETTES } from "../../plugins/newsletter/theme.ts";
 
-// The newsletter's theme: name, logo, colours, font and glow banner, with the
+// The newsletter's theme: name, logo, colors, font and glow banner, with the
 // email previewed live as they change (src/scripts/theme-editor.ts). Saved
 // through the newsletter plugin's theme-update route, which refuses a theme
 // that would be hard to read. Claude edits the same theme through the
@@ -30,6 +30,8 @@ const colors = [
 ---
 
 <Newsletter title="Theme">
+  {/* So each font is listed in its own face. */}
+  {Object.values(FONTS).map((f) => f.link && <link rel="stylesheet" href={f.link} />)}
   <section class="theme shell">
     <h1 class="display theme__title">Theme</h1>
     {
@@ -47,7 +49,7 @@ const colors = [
                 Name <input name="name" required maxlength="60" />
               </label>
               <label>
-                In the accent colour
+                In the accent color
                 <select data-accent-words />
                 <span class="theme__hint">The end of the name can stand out, like “Field <em>Notes</em>”.</span>
               </label>
@@ -81,7 +83,26 @@ const colors = [
             </fieldset>
 
             <fieldset>
-              <legend>Colours</legend>
+              <legend>Colors</legend>
+              <div class="theme__palettes" role="group" aria-label="Suggested colors">
+                <button type="button" class="theme__palette" data-palette="logo" hidden>
+                  <span class="theme__swatches" data-logo-swatches />
+                  From the logo
+                </button>
+                {
+                  PALETTES.map((p, i) => (
+                    <button type="button" class="theme__palette" data-palette={i}>
+                      <span class="theme__swatches">
+                        {[p.colors.accent, p.colors.accent2, p.colors.page].map((c) => (
+                          <span style={`background:${c}`} />
+                        ))}
+                      </span>
+                      {p.name}
+                    </button>
+                  ))
+                }
+              </div>
+              <p class="theme__hint">Start from one of these, then fine-tune any color below.</p>
               {
                 colors.map(([key, label, hint]) => (
                   <label class="theme__color">
@@ -100,11 +121,20 @@ const colors = [
               <legend>Type and art</legend>
               <label>
                 Font
-                <select name="font">
-                  {Object.entries(FONTS).map(([key, f]) => (
-                    <option value={key}>{f.label}</option>
+                <select name="font" class="theme__font-select" data-font>
+                  {(["Sans serif", "Serif"] as const).map((group) => (
+                    <optgroup label={group}>
+                      {Object.entries(FONTS)
+                        .filter(([, f]) => f.group === group)
+                        .map(([key, f]) => (
+                          <option value={key} style={`font-family:${f.stack}`}>
+                            {f.label}
+                          </option>
+                        ))}
+                    </optgroup>
                   ))}
                 </select>
+                <span class="theme__hint" data-font-elsewhere />
               </label>
               <label class="theme__check">
                 <input type="checkbox" data-banner-on /> Glow banner across the top
@@ -239,6 +269,82 @@ const colors = [
     border-radius: 8px;
     background: none;
     cursor: pointer;
+  }
+
+  .theme__palettes {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(10.5rem, 1fr));
+    gap: 0.5rem;
+  }
+
+  .theme__palette {
+    font: inherit;
+    font-size: 0.85rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.4rem 0.6rem;
+    border: 1px solid var(--rule);
+    border-radius: 8px;
+    background: transparent;
+    color: inherit;
+    cursor: pointer;
+    text-align: left;
+  }
+
+  .theme__palette[hidden] {
+    display: none;
+  }
+
+  .theme__palette:hover {
+    border-color: var(--ink-soft);
+  }
+
+  .theme__palette[aria-pressed="true"] {
+    border-color: var(--blue);
+    box-shadow: inset 0 0 0 1px var(--blue);
+  }
+
+  /* A customizable select where the browser has it (Chrome), so each font is
+     listed in its own face; elsewhere an ordinary dropdown of names. */
+  .theme__font-select,
+  .theme__font-select::picker(select) {
+    appearance: base-select;
+  }
+
+  .theme__font-select::picker(select) {
+    max-height: 22rem;
+    border: 1px solid var(--rule);
+    border-radius: 8px;
+    background: var(--stone-sunk);
+    color: var(--ink);
+  }
+
+  .theme__font-select option {
+    font-size: 1rem;
+    padding: 0.35rem 0.6rem;
+  }
+
+  .theme__font-select optgroup {
+    font: 600 0.75rem var(--font-body);
+    color: var(--ink-soft);
+  }
+
+  .theme__swatches {
+    display: flex;
+    flex: none;
+  }
+
+  /* :global: the logo's swatches are made by the script. */
+  .theme__swatches :global(span) {
+    width: 1rem;
+    height: 1rem;
+    border-radius: 50%;
+    border: 1px solid rgba(0, 0, 0, 0.15);
+  }
+
+  .theme__swatches :global(span + span) {
+    margin-left: -0.3rem;
   }
 
   .theme__color-name {

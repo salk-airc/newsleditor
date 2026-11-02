@@ -84,10 +84,10 @@ interface Presence {
 
 const API = "/_emdash/api/content/editions";
 
-// Cursor colours for the people in the room, picked by Yjs client id.
+// Cursor colors for the people in the room, picked by Yjs client id.
 const COLORS = ["#2d46b9", "#007e3b", "#b3261e", "#8a5a00", "#6b3fa0", "#00708a"];
 
-// Markdown colours from the site's tokens, so they read in light and dark.
+// Markdown colors from the site's tokens, so they read in light and dark.
 const highlight = HighlightStyle.define([
   { tag: t.heading, color: "var(--blue)", fontWeight: "700" },
   { tag: [t.strong], fontWeight: "700" },
@@ -280,7 +280,7 @@ export async function startEditor(root: HTMLElement): Promise<void> {
   // written back into the markdown as ![caption](url "w=NNN frame=accent2"),
   // which every render already understands: the caption is the alt text
   // (shown under the image in the email), w= the width in pixels (none: the
-  // full column), frame= the frame in the theme's colours (none: accent).
+  // full column), frame= the frame in the theme's colors (none: accent).
 
   // The newsletter's look, for the email preview and the frame swatches, and
   // its settings, for the signature: the defaults until the stored ones load

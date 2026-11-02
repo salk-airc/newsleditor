@@ -144,7 +144,7 @@ export function startSetup(form: HTMLFormElement) {
     const file = input.files?.[0];
     input.value = "";
     if (!file) return;
-    // The colours first, from the file itself: an image the browser can't
+    // The colors first, from the file itself: an image the browser can't
     // read isn't worth uploading.
     let colors: string[];
     const local = URL.createObjectURL(file);
@@ -171,8 +171,8 @@ export function startSetup(form: HTMLFormElement) {
         }),
       );
       status.textContent = colors.length
-        ? "Colours taken from the logo."
-        : "The logo has no strong colours, so the default ones stay.";
+        ? "Colors taken from the logo."
+        : "The logo has no strong colors, so the default ones stay.";
       render();
     } catch (err) {
       status.textContent = `Logo not uploaded: ${(err as Error).message}`;

@@ -2,7 +2,7 @@
 // loads with srcdoc, later ones swap the new <body> (and <head>, if it
 // changed) into the page already there. Setting srcdoc on every change made
 // the frame flash and reload its fonts and images, e.g. while dragging a
-// colour picker. The studio's preview (edition-editor.ts) works the same way.
+// color picker. The studio's preview (edition-editor.ts) works the same way.
 
 export function previewFrame(frame: HTMLIFrameElement): (html: string) => void {
   let loading = false;

@@ -19,12 +19,12 @@ import { DEFAULT_THEME, bannerUrl, type DrawnArt, FONTS, mix, rgb, ruleUrl, type
 // - "> " blockquotes become a tinted callout card;
 // - a paragraph of only [text](url "button") links becomes a button row, the
 //   first one filled, the rest outlined;
-// - image rows get a frame in the theme's colours ("frame=accent2" etc. in
+// - image rows get a frame in the theme's colors ("frame=accent2" etc. in
 //   the image's title) and their alt text as a caption.
 //
 // Styles are inline: pasting into Outlook keeps those and drops <style>.
-// Colour that has to survive Outlook on the web (which drops CSS gradients
-// from a paste) and phone dark modes (which recolour text but never images)
+// Color that has to survive Outlook on the web (which drops CSS gradients
+// from a paste) and phone dark modes (which recolor text but never images)
 // is drawn as images by the site: the banner and the rules (/email/art/).
 
 const HIGHLIGHT = "; background:#fff3b0";
@@ -69,7 +69,7 @@ interface Style {
   media: string | null;
 }
 
-/** An image frame's colour in a theme (null: no frame). Solid colours: the accents at ~30% on white, and a stone grey. */
+/** An image frame's color in a theme (null: no frame). Solid colors: the accents at ~30% on white, and a stone grey. */
 export function frameColors(theme: Theme): Record<Frame, string | null> {
   const { accent, accent2 } = theme.colors;
   return { accent: mix(accent, "#ffffff", 0.3), accent2: mix(accent2, "#ffffff", 0.3), grey: "#dcd8cf", none: null };
@@ -138,7 +138,7 @@ export function renderDesignedEmail(markdown: string, options: RenderDesignedEma
           .map((item, i) => {
             const marker = token.ordered
               ? `<span style="${s.font}; font-size:14px; font-weight:600; color:${s.accent}">${Number(token.start || 1) + i}.</span>`
-              : // A text bullet, not a dot image: dark modes recolour text
+              : // A text bullet, not a dot image: dark modes recolor text
                 // but never images, which stayed dark blue on dark.
                 `<span style="${s.font}; font-size:20px; line-height:27px; color:${s.accent}">&bull;</span>`;
             return (
@@ -202,12 +202,12 @@ export function renderDesignedEmail(markdown: string, options: RenderDesignedEma
     `<title>${escapeHtml(options.title)}</title>` +
     (fontLink ? `<link href="${fontLink}" rel="stylesheet">` : "") +
     `</head><body style="margin:0; padding:0; background:${s.page}">` +
-    // No card: the page colour runs edge to edge, as in Bloom's emails, and
+    // No card: the page color runs edge to edge, as in Bloom's emails, and
     // the text sits in a centred column.
     `<table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="background-color:${s.page}">` +
     `<tr><td align="center" style="padding:0 12px">` +
     // The glow is a picture at the top of the column, faded to the page
-    // colour at its edges; the masthead under it stays real text.
+    // color at its edges; the masthead under it stays real text.
     (banner
       ? column(
           "0",
@@ -312,7 +312,7 @@ function imageRow(s: Style, images: Tokens.Image[], resolveImage: (src: string) 
         `style="display:block; width:${width}px; max-width:100%; height:auto; border:0; border-radius:10px">`;
       return (
         `<td style="padding:0 20px 0 0; vertical-align:top">` +
-        // The frame is a padded, coloured cell around the image: Outlook on
+        // The frame is a padded, colored cell around the image: Outlook on
         // the web drops borders on a pasted <img> but keeps cell backgrounds.
         (frame
           ? `<table cellpadding="0" cellspacing="0" role="presentation" style="border-collapse:separate"><tr>` +

@@ -1,8 +1,18 @@
-import { editionTitle, formatDate, nextOpenEditionDate } from "../plugins/newsletter/editions.ts";
+import { editionTitle, formatDate, nextOpenEditionDate, starterBody } from "../plugins/newsletter/editions.ts";
 import { renderDesignedEmail } from "../plugins/newsletter/email-designed.ts";
 import { DEFAULT_SETTINGS, type Settings } from "../plugins/newsletter/settings.ts";
-import { checkTheme, DEFAULT_THEME, type DrawnArt, type Theme, type ThemeCheck, themeChanges } from "../plugins/newsletter/theme.ts";
+import {
+  checkTheme,
+  DEFAULT_THEME,
+  type DrawnArt,
+  FONTS,
+  PALETTES,
+  type Theme,
+  type ThemeCheck,
+  themeChanges,
+} from "../plugins/newsletter/theme.ts";
 import { plugin, uploadImage } from "./emdash-api.ts";
+import { logoColors, themeFromColors } from "./logo-colors.ts";
 import { drawnArt } from "./preview-art.ts";
 import { previewFrame } from "./preview-frame.ts";
 
@@ -76,6 +86,8 @@ export function startThemeEditor(root: HTMLElement) {
   const logoImg = $<HTMLImageElement>("[data-logo-img]");
   const logoNone = $<HTMLElement>("[data-logo-none]");
   const text = (name: string) => form.elements.namedItem(name) as HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement;
+  const fontSelect = $<HTMLSelectElement>("[data-font]");
+  const fontElsewhere = $<HTMLElement>("[data-font-elsewhere]");
 
   let saved: Theme = DEFAULT_THEME;
   let theme: Theme = DEFAULT_THEME;
@@ -96,10 +108,7 @@ export function startThemeEditor(root: HTMLElement) {
     text("name").value = t.nameTail ? `${t.nameLead} ${t.nameTail}` : t.nameLead;
     accentChoices(words(t.nameTail).length);
     for (const name of ["footer", "wordmark", "tagline", "font"] as const) text(name).value = t[name];
-    for (const key of Object.keys(t.colors) as ColorKey[]) {
-      $<HTMLInputElement>(`[data-color="${key}"]`).value = t.colors[key].toLowerCase();
-      $<HTMLInputElement>(`[data-hex="${key}"]`).value = t.colors[key].toLowerCase();
-    }
+    setColors(t.colors);
     $<HTMLInputElement>("[data-banner-on]").checked = t.banner.style === "glow";
     $<HTMLInputElement>("[data-banner-strength]").value = String(t.banner.strength);
     $<HTMLInputElement>("[data-rules-on]").checked = t.rules;
@@ -145,7 +154,68 @@ export function startThemeEditor(root: HTMLElement) {
     logoImg.hidden = !src;
     logoNone.hidden = !!src;
     if (src) logoImg.src = src;
+    logoPalette(src);
   }
+
+  // ------------------------------------------------------------ palettes --
+
+  const paletteButtons = [...root.querySelectorAll<HTMLButtonElement>("[data-palette]")];
+  const logoButton = $<HTMLButtonElement>('[data-palette="logo"]');
+  /** The colors taken from the logo, as setup takes them; null without a logo or with no strong colors. */
+  let fromLogo: Theme["colors"] | null = null;
+
+  function paletteColors(key: string): Theme["colors"] | null {
+    return key === "logo" ? fromLogo : (PALETTES[Number(key)]?.colors ?? null);
+  }
+
+  function setColors(colors: Theme["colors"]) {
+    for (const key of Object.keys(colors) as ColorKey[]) {
+      $<HTMLInputElement>(`[data-color="${key}"]`).value = colors[key].toLowerCase();
+      $<HTMLInputElement>(`[data-hex="${key}"]`).value = colors[key].toLowerCase();
+    }
+  }
+
+  /** Marks the palette the colors match, if any. */
+  function showPalette() {
+    const same = (a: Theme["colors"], b: Theme["colors"]) =>
+      (Object.keys(a) as ColorKey[]).every((k) => a[k].toLowerCase() === b[k].toLowerCase());
+    for (const b of paletteButtons) {
+      const colors = paletteColors(b.dataset.palette!);
+      b.setAttribute("aria-pressed", String(!!colors && same(colors, theme.colors)));
+    }
+  }
+
+  let logoRequest = 0;
+  async function logoPalette(src: string | null) {
+    const request = ++logoRequest;
+    fromLogo = null;
+    logoButton.hidden = true;
+    if (!src) return;
+    try {
+      const colors = await logoColors(src);
+      if (request !== logoRequest || !colors.length) return;
+      fromLogo = themeFromColors(colors, { ...DEFAULT_THEME, colors: { ...DEFAULT_THEME.colors, page: theme.colors.page } }).colors;
+      $<HTMLElement>("[data-logo-swatches]").replaceChildren(
+        ...[fromLogo.accent, fromLogo.accent2, fromLogo.page].map((c) => {
+          const span = document.createElement("span");
+          span.style.background = c;
+          return span;
+        }),
+      );
+      logoButton.hidden = false;
+      showPalette();
+    } catch {
+      // A logo the browser can't read the pixels of (another site's, without CORS): no logo palette.
+    }
+  }
+
+  for (const b of paletteButtons)
+    b.addEventListener("click", () => {
+      const colors = paletteColors(b.dataset.palette!);
+      if (!colors) return;
+      setColors(colors);
+      update();
+    });
 
   // ------------------------------------------------------------- preview --
 
@@ -153,11 +223,18 @@ export function startThemeEditor(root: HTMLElement) {
 
   function update() {
     theme = read();
+    // The dropdown shows its font in that font, and what Outlook shows instead.
+    const font = FONTS[theme.font];
+    fontSelect.style.fontFamily = font.stack;
+    fontElsewhere.textContent = font.elsewhere
+      ? `A web font: Apple Mail and iPhones show it; Outlook and Gmail show ${font.elsewhere}.`
+      : "On most computers already, so it looks the same everywhere.";
     const bad = (Object.keys(theme.colors) as ColorKey[]).filter((k) => !validHex(theme.colors[k]));
     const check: ThemeCheck = bad.length
-      ? { errors: bad.map((k) => `${k}: “${theme.colors[k]}” isn't a 6-digit hex colour like #3557a0.`), warnings: [] }
+      ? { errors: bad.map((k) => `${k}: “${theme.colors[k]}” isn't a 6-digit hex color like #3557a0.`), warnings: [] }
       : checkTheme(theme, media);
     showProblems(check);
+    showPalette();
     const changed = Object.keys(changes()).length > 0;
     save.disabled = !loaded || !changed || check.errors.length > 0;
     if (changed) status.textContent = "Not saved yet";
@@ -165,7 +242,7 @@ export function startThemeEditor(root: HTMLElement) {
     if (!bad.length) render();
   }
 
-  // Only what differs from the saved theme (the form shows colours in lower
+  // Only what differs from the saved theme (the form shows colors in lower
   // case; themeChanges compares them without case).
   const changes = () => themeChanges(saved, theme);
 
@@ -184,8 +261,12 @@ export function startThemeEditor(root: HTMLElement) {
 
   function render() {
     // The subject is the inbox's, not the email's: shown over the preview.
-    subject.textContent = `Subject: ${editionTitle(settings, nextEditionDate(settings))}`;
-    let html = sampleEmail(theme, settings, undefined, art);
+    subject.textContent = `Email subject (what the inbox shows): ${editionTitle(settings, nextEditionDate(settings))}`;
+    // The newsletter's own starter text when it has one, so the preview
+    // looks like its next edition; the sample otherwise.
+    const date = nextEditionDate(settings);
+    const starter = settings.starter.trim() ? { body: starterBody(settings, date), date } : undefined;
+    let html = sampleEmail(theme, settings, starter, art);
     // Images stay as they are in a dark mode: flip them back inside the
     // inverted frame.
     if (dark.checked) html = html.replace("</head>", "<style>img{filter:invert(1) hue-rotate(180deg)}</style></head>");
