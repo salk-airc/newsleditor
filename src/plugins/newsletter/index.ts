@@ -583,7 +583,7 @@ export function createPlugin() {
         },
         theme_update: {
           description:
-            "Change the newsletter's theme when the user asks for new branding. Pass only what changes. Email limits apply: the page must be light, text (ink) near-black so phone dark modes turn it white, and the accents deep enough to read as link text; the glow banner and rules are drawn as images from accent and accent2, so gradients aren't set directly. A logo must be on this site: media_upload it and use the path it returns (/_emdash/api/media/file/...), ideally a transparent PNG; links to other sites are refused. If the result would be hard to read, nothing is saved and saved is false: tell the user the errors and suggest a fix. Tell them any warnings too.",
+            "Change the newsletter's theme when the user asks for new branding. Pass only what changes. Email limits apply: the page must be light, text (ink) near-black so phone dark modes turn it white, and the accents deep enough to read as link text; the glow banner and rules are drawn as images from accent and accent2, so gradients aren't set directly; rules: false removes the lines under the name and headings. A logo must be on this site: media_upload it and use the path it returns (/_emdash/api/media/file/...), ideally a transparent PNG; links to other sites are refused. If the result would be hard to read, nothing is saved and saved is false: tell the user the errors and suggest a fix. Tell them any warnings too.",
           route: "theme-update",
           input: themeUpdateInput,
           output: themeUpdateOutput,

@@ -29,6 +29,7 @@ import { renderSlack } from "../plugins/newsletter/slack.ts";
 import { renderWeb } from "../plugins/newsletter/web.ts";
 import editionCss from "../styles/edition-body.css?inline";
 import { merge, setText } from "./merge.ts";
+import { drawnArt } from "./preview-art.ts";
 import siteCss from "../styles/global.css?inline";
 
 // Browser side of /newsletter/edit/<slug>. Everyone who opens the page edits
@@ -536,9 +537,10 @@ export async function startEditor(root: HTMLElement): Promise<void> {
   };
 
   // sending: the email as copied, with the banner and rules from the bucket
-  // (once they're there). The preview has the site draw them, so it never
-  // waits on the bucket.
-  function rendered(v: Exclude<View, "inbox">, sending: { art: boolean } = { art: false }): string {
+  // (once they're there; else the site's). The preview draws them itself
+  // (preview-art.ts), so it never waits on, or loses, a download.
+  const previewArt = drawnArt(() => render());
+  function rendered(v: Exclude<View, "inbox">, sending?: { art: boolean }): string {
     if (v === "email") {
       const date = /^\d{4}-\d{2}-\d{2}$/.test(slug) ? formatDate(new Date(`${slug}T12:00:00.000Z`)) : undefined;
       return renderDesignedEmail(text("body"), {
@@ -547,7 +549,8 @@ export async function startEditor(root: HTMLElement): Promise<void> {
         theme,
         resolveImage,
         site: location.origin,
-        media: sending.art ? media : null,
+        media: sending?.art ? media : null,
+        drawn: sending ? undefined : previewArt,
         signature: settings.signature,
       });
     }

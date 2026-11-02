@@ -65,6 +65,8 @@ export const themeSchema = z.object({
     /** 0 (faint) to 100 (strong). */
     strength: z.number().int().min(0).max(100),
   }),
+  /** The accent lines (rules) under the name and the section headings. */
+  rules: z.boolean(),
 });
 export type Theme = z.infer<typeof themeSchema>;
 
@@ -100,6 +102,7 @@ export const DEFAULT_THEME: Theme = {
   },
   font: "sans",
   banner: { style: "glow", strength: 60 },
+  rules: true,
 };
 
 export function applyPatch(theme: Theme, patch: ThemePatch): Theme {
@@ -222,12 +225,21 @@ const bare = (c: string) => c.slice(1).toLowerCase();
 /** One drawing in a theme's email: colours as 6-digit hex without "#". */
 export type ArtSpec = { kind: "glow"; a: string; b: string; strength: number } | { kind: "rule"; a: string; b: string };
 
-/** The drawings a theme's email shows: the rule, and the glow unless the banner is off. */
+/** The drawings a theme's email shows: the glow unless the banner is off, and the rule unless the rules are. */
 export function artSpecs(theme: Theme): ArtSpec[] {
   const [a, b] = [bare(theme.colors.accent), bare(theme.colors.accent2)];
-  const rule: ArtSpec = { kind: "rule", a, b };
-  return theme.banner.style === "none" ? [rule] : [{ kind: "glow", a, b, strength: theme.banner.strength }, rule];
+  const specs: ArtSpec[] = [];
+  if (theme.banner.style !== "none") specs.push({ kind: "glow", a, b, strength: theme.banner.strength });
+  if (theme.rules) specs.push({ kind: "rule", a, b });
+  return specs;
 }
+
+/**
+ * A drawing already drawn where the email is shown, as a data: URL: the
+ * studio's previews draw their own (src/scripts/preview-art.ts), so they never
+ * wait on, or lose, a download. Undefined: use the drawing's address.
+ */
+export type DrawnArt = (spec: ArtSpec) => string | undefined;
 
 /** A drawing's key in the images bucket. It names everything drawn, so what's there never changes. */
 export function artKey(spec: ArtSpec): string {
@@ -245,12 +257,13 @@ function artUrl(spec: ArtSpec, base: string, media?: string | null): string {
 }
 
 /** The glow banner image for a theme, or null when it has none. Its URL says everything it draws, so it never changes. */
-export function bannerUrl(theme: Theme, base: string, media?: string | null): string | null {
+export function bannerUrl(theme: Theme, base: string, media?: string | null, drawn?: DrawnArt): string | null {
   const glow = artSpecs(theme).find((spec) => spec.kind === "glow");
-  return glow ? artUrl(glow, base, media) : null;
+  return glow ? (drawn?.(glow) ?? artUrl(glow, base, media)) : null;
 }
 
-/** The accent-to-accent2 rule image. */
-export function ruleUrl(theme: Theme, base: string, media?: string | null): string {
-  return artUrl(artSpecs(theme).find((spec) => spec.kind === "rule")!, base, media);
+/** The accent-to-accent2 rule image, or null when the theme has no rules. */
+export function ruleUrl(theme: Theme, base: string, media?: string | null, drawn?: DrawnArt): string | null {
+  const rule = artSpecs(theme).find((spec) => spec.kind === "rule");
+  return rule ? (drawn?.(rule) ?? artUrl(rule, base, media)) : null;
 }

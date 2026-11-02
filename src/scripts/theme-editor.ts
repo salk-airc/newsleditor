@@ -1,8 +1,9 @@
 import { editionTitle, formatDate } from "../plugins/newsletter/editions.ts";
 import { renderDesignedEmail } from "../plugins/newsletter/email-designed.ts";
 import { DEFAULT_SETTINGS, type Settings } from "../plugins/newsletter/settings.ts";
-import { checkTheme, DEFAULT_THEME, type Theme, type ThemeCheck, themeChanges } from "../plugins/newsletter/theme.ts";
+import { checkTheme, DEFAULT_THEME, type DrawnArt, type Theme, type ThemeCheck, themeChanges } from "../plugins/newsletter/theme.ts";
 import { plugin, uploadImage } from "./emdash-api.ts";
+import { drawnArt } from "./preview-art.ts";
 import { previewFrame } from "./preview-frame.ts";
 
 // The Theme page (src/pages/newsletter/theme.astro): a form over the
@@ -34,12 +35,18 @@ See you next time!
  * An edition as an email in a theme, with the newsletter's signature: the
  * sample text, or an edition's body and date (setup shows the starter text).
  */
-export function sampleEmail(theme: Theme, settings: Settings = DEFAULT_SETTINGS, edition?: { body: string; date: Date }): string {
+export function sampleEmail(
+  theme: Theme,
+  settings: Settings = DEFAULT_SETTINGS,
+  edition?: { body: string; date: Date },
+  drawn?: DrawnArt,
+): string {
   return renderDesignedEmail(edition?.body ?? SAMPLE, {
     title: edition ? editionTitle(settings, edition.date) : settings.name,
     date: edition ? formatDate(edition.date) : new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
     theme,
     site: location.origin,
+    drawn,
     resolveImage: (src) => new URL(src, location.origin).href,
     signature: settings.signature,
   });
@@ -80,6 +87,7 @@ export function startThemeEditor(root: HTMLElement) {
     }
     $<HTMLInputElement>("[data-banner-on]").checked = t.banner.style === "glow";
     $<HTMLInputElement>("[data-banner-strength]").value = String(t.banner.strength);
+    $<HTMLInputElement>("[data-rules-on]").checked = t.rules;
     showLogo(t.logo);
   }
 
@@ -99,6 +107,7 @@ export function startThemeEditor(root: HTMLElement) {
         style: $<HTMLInputElement>("[data-banner-on]").checked ? "glow" : "none",
         strength: Number($<HTMLInputElement>("[data-banner-strength]").value),
       },
+      rules: $<HTMLInputElement>("[data-rules-on]").checked,
     };
   }
 
@@ -141,8 +150,10 @@ export function startThemeEditor(root: HTMLElement) {
     );
   }
 
+  const art = drawnArt(() => render());
+
   function render() {
-    let html = sampleEmail(theme, settings);
+    let html = sampleEmail(theme, settings, undefined, art);
     // Images stay as they are in a dark mode: flip them back inside the
     // inverted frame.
     if (dark.checked) html = html.replace("</head>", "<style>img{filter:invert(1) hue-rotate(180deg)}</style></head>");
