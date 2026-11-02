@@ -1,4 +1,4 @@
-import { editionTitle } from "../plugins/newsletter/editions.ts";
+import { editionTitle, nextOpenEditionDate, starterBody } from "../plugins/newsletter/editions.ts";
 import type { Settings, SettingsPatch } from "../plugins/newsletter/settings.ts";
 import { checkTheme, DEFAULT_THEME, type Theme, type ThemeCheck, themeChanges } from "../plugins/newsletter/theme.ts";
 import { plugin, uploadImage } from "./emdash-api.ts";
@@ -85,12 +85,23 @@ export function startSetup(form: HTMLFormElement) {
     return theme.nameLead === DEFAULT_THEME.nameLead || !configured ? { ...theme, nameLead: name } : theme;
   }
 
+  // The preview is the next edition as it would start: its date (from
+  // "Goes out" and the time zone), its subject, and the starter text as the
+  // body, with the signature and the look.
   function render() {
     const draft = { ...settings, ...read(), sender: settings.sender } as Settings;
-    subjectPreview.textContent = `An edition's subject will read: ${editionTitle({ ...draft, name: draft.name || "Your newsletter" }, new Date())}`;
+    const named = { ...draft, name: draft.name || "Your newsletter" };
+    let date: Date;
+    try {
+      date = nextOpenEditionDate(named, new Set()).date;
+    } catch {
+      // A time zone that's still being typed.
+      date = new Date(`${new Date().toISOString().slice(0, 10)}T12:00:00.000Z`);
+    }
+    subjectPreview.textContent = `The next edition's subject will read: ${editionTitle(named, date)}`;
     const t = currentTheme();
     showProblems(checkTheme(t, media));
-    show(sampleEmail(t, draft));
+    show(sampleEmail(t, named, draft.starter.trim() ? { body: starterBody(named, date), date } : undefined));
   }
 
   function showProblems({ errors, warnings }: ThemeCheck, extra: string[] = []) {

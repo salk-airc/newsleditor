@@ -1,3 +1,4 @@
+import { editionTitle, formatDate } from "../plugins/newsletter/editions.ts";
 import { renderDesignedEmail } from "../plugins/newsletter/email-designed.ts";
 import { DEFAULT_SETTINGS, type Settings } from "../plugins/newsletter/settings.ts";
 import { checkTheme, DEFAULT_THEME, type Theme, type ThemeCheck, themeChanges } from "../plugins/newsletter/theme.ts";
@@ -29,11 +30,14 @@ A paragraph with a [link to something](https://example.com), **bold text** and a
 See you next time!
 `;
 
-/** The sample edition as an email in a theme, with the newsletter's signature. */
-export function sampleEmail(theme: Theme, settings: Settings = DEFAULT_SETTINGS): string {
-  return renderDesignedEmail(SAMPLE, {
-    title: settings.name,
-    date: new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
+/**
+ * An edition as an email in a theme, with the newsletter's signature: the
+ * sample text, or an edition's body and date (setup shows the starter text).
+ */
+export function sampleEmail(theme: Theme, settings: Settings = DEFAULT_SETTINGS, edition?: { body: string; date: Date }): string {
+  return renderDesignedEmail(edition?.body ?? SAMPLE, {
+    title: edition ? editionTitle(settings, edition.date) : settings.name,
+    date: edition ? formatDate(edition.date) : new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
     theme,
     site: location.origin,
     resolveImage: (src) => new URL(src, location.origin).href,
