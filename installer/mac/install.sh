@@ -163,8 +163,16 @@ agent() { # label program args… : a LaunchAgent that runs at login and restart
 </dict></plist>
 EOF
   chmod 600 "$plist"
+  # Stopping a job finishes after bootout returns, and starting it again
+  # before then fails ("Bootstrap failed: 5: Input/output error"): wait for it
+  # to be gone, then start it, trying again briefly.
   launchctl bootout "gui/$uid/$label" 2>/dev/null || true
-  launchctl bootstrap "gui/$uid" "$plist"
+  for _ in $(seq 1 15); do launchctl print "gui/$uid/$label" >/dev/null 2>&1 || break; sleep 1; done
+  for _ in $(seq 1 5); do
+    launchctl bootstrap "gui/$uid" "$plist" 2>/dev/null && return 0
+    sleep 2
+  done
+  launchctl bootstrap "gui/$uid" "$plist" || fail "Couldn't start $label. Log out and in again, or restart the Mac, and it starts by itself."
 }
 
 token="$(cat "$HOME_DIR/tunnel-token" 2>/dev/null || true)"
