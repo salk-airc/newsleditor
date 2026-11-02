@@ -1,6 +1,6 @@
 import { Marked, type Token, type Tokens } from "marked";
 import { type Frame, groupImageRows, imageHints, PLACEHOLDER, signatureHtml } from "./email.ts";
-import { DEFAULT_THEME, bannerUrl, FONTS, mix, rgb, ruleUrl, type Theme } from "./theme.ts";
+import { DEFAULT_THEME, bannerUrl, type DrawnArt, FONTS, mix, rgb, ruleUrl, type Theme } from "./theme.ts";
 
 // Markdown edition body -> the designed newsletter email, in the newsletter's
 // theme (theme.ts). Same markdown as email.ts, which stays the plain renderer
@@ -43,6 +43,8 @@ export interface RenderDesignedEmailOptions {
   site: string;
   /** The images bucket's public address, when the banner and rules are kept there (src/lib/bucket.ts); else the site draws them. */
   media?: string | null;
+  /** Art already drawn where it's shown (previews only, never a copied email): see DrawnArt. */
+  drawn?: DrawnArt;
   /** The signature in markdown (the newsletter's setting); false or empty for none. */
   signature?: string | false;
 }
@@ -73,9 +75,9 @@ export function frameColors(theme: Theme): Record<Frame, string | null> {
   return { accent: mix(accent, "#ffffff", 0.3), accent2: mix(accent2, "#ffffff", 0.3), grey: "#dcd8cf", none: null };
 }
 
-function style(theme: Theme, site: string, media: string | null): Style {
+function style(theme: Theme, site: string, media: string | null, drawn?: DrawnArt): Style {
   const { page, ink, muted, rule, accent, accent2 } = theme.colors;
-  const ruleSrc = ruleUrl(theme, site, media);
+  const ruleSrc = ruleUrl(theme, site, media, drawn);
   return {
     theme,
     font: `font-family:${FONTS[theme.font].stack}`,
@@ -91,9 +93,12 @@ function style(theme: Theme, site: string, media: string | null): Style {
     frames: frameColors(theme),
     // The rule is an image, not a styled empty <div>: Outlook on the web
     // drops empty divs and CSS gradients from a paste but keeps images.
+    // Nothing when the theme has its rules off.
     ruleImg: (width) =>
-      `<img alt="" src="${escapeAttr(ruleSrc)}" width="${width}" height="3" ` +
-      `style="display:block; width:${width}px; height:3px; border:0">`,
+      ruleSrc
+        ? `<img alt="" src="${escapeAttr(ruleSrc)}" width="${width}" height="3" ` +
+          `style="display:block; width:${width}px; height:3px; border:0">`
+        : "",
     site,
     media,
   };
@@ -101,7 +106,7 @@ function style(theme: Theme, site: string, media: string | null): Style {
 
 export function renderDesignedEmail(markdown: string, options: RenderDesignedEmailOptions): string {
   const resolveImage = options.resolveImage ?? ((src) => src);
-  const s = style(options.theme ?? DEFAULT_THEME, options.site, options.media ?? null);
+  const s = style(options.theme ?? DEFAULT_THEME, options.site, options.media ?? null, options.drawn);
   const P = `${s.font}; font-size:16px; line-height:1.7; color:${s.ink}; margin:0 0 18px`;
   const md = new Marked();
 
@@ -187,7 +192,7 @@ export function renderDesignedEmail(markdown: string, options: RenderDesignedEma
   const column = (padding: string, inner: string) =>
     `<table cellpadding="0" cellspacing="0" role="presentation" style="width:100%; max-width:640px">` +
     `<tr><td style="padding:${padding}">${inner}</td></tr></table>`;
-  const banner = bannerUrl(s.theme, s.site, s.media);
+  const banner = bannerUrl(s.theme, s.site, s.media, options.drawn);
   const fontLink = FONTS[s.theme.font].link;
 
   return (

@@ -3,6 +3,7 @@ import type { Settings, SettingsPatch } from "../plugins/newsletter/settings.ts"
 import { checkTheme, DEFAULT_THEME, type Theme, type ThemeCheck, themeChanges } from "../plugins/newsletter/theme.ts";
 import { plugin, uploadImage } from "./emdash-api.ts";
 import { logoColors, themeFromColors } from "./logo-colors.ts";
+import { drawnArt } from "./preview-art.ts";
 import { previewFrame } from "./preview-frame.ts";
 import { sampleEmail } from "./theme-editor.ts";
 
@@ -85,6 +86,8 @@ export function startSetup(form: HTMLFormElement) {
     return theme.nameLead === DEFAULT_THEME.nameLead || !configured ? { ...theme, nameLead: name } : theme;
   }
 
+  const art = drawnArt(() => render());
+
   // The preview is the next edition as it would start: its date (from
   // "Goes out" and the time zone), its subject, and the starter text as the
   // body, with the signature and the look.
@@ -101,7 +104,7 @@ export function startSetup(form: HTMLFormElement) {
     subjectPreview.textContent = `The next edition's subject will read: ${editionTitle(named, date)}`;
     const t = currentTheme();
     showProblems(checkTheme(t, media));
-    show(sampleEmail(t, named, draft.starter.trim() ? { body: starterBody(named, date), date } : undefined));
+    show(sampleEmail(t, named, draft.starter.trim() ? { body: starterBody(named, date), date } : undefined, art));
   }
 
   function showProblems({ errors, warnings }: ThemeCheck, extra: string[] = []) {
