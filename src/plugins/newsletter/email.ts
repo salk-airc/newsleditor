@@ -1,4 +1,5 @@
 import { Marked, type Token, type Tokens } from "marked";
+import { styledText } from "./styling.ts";
 
 // Markdown edition body -> plain Outlook-safe email HTML, the renderer for a
 // newsletter that wants no design at all:
@@ -37,6 +38,8 @@ export function renderEmail(markdown: string, options: RenderEmailOptions): stri
   const resolveImage = options.resolveImage ?? ((src) => src);
   const md = new Marked();
 
+  // Styled words keep just their words: the plain email has no theme colors.
+  md.use(styledText());
   md.use({
     renderer: {
       heading({ tokens }) {
@@ -92,22 +95,26 @@ function imagesOnly(token: Token): Tokens.Image[] | null {
 // into one array, so they render as a single side-by-side row.
 /**
  * The frames an image can have in the designed email, in the newsletter
- * theme's colors: its accent (the default), its second accent, grey or none.
+ * theme's colors: its accent (the default), its second accent, grey or none;
+ * or any color, as #rrggbb.
  */
 export const FRAMES = ["accent", "accent2", "grey", "none"] as const;
-export type Frame = (typeof FRAMES)[number];
+export type FrameName = (typeof FRAMES)[number];
+export type Frame = FrameName | `#${string}`;
 // Older names for the frames, still read.
-const FRAME_ALIASES: Record<string, Frame> = { lavender: "accent", green: "accent2" };
+const FRAME_ALIASES: Record<string, FrameName> = { lavender: "accent", green: "accent2" };
 
 /**
  * An image's title holds its display hints, space-separated: "w=NNN" for the
- * width in pixels and "frame=accent2" for the frame. Either can be missing.
+ * width in pixels and "frame=accent2" (or "frame=#c0392b") for the frame.
+ * Either can be missing.
  */
 export function imageHints(title: string | null | undefined): { width: number | null; frame: Frame | null } {
   const width = Number(title?.match(/(?:^|\s)w=(\d+)(?:\s|$)/)?.[1]) || null;
-  const name = title?.match(/(?:^|\s)frame=([a-z0-9]+)(?:\s|$)/)?.[1];
+  const name = title?.match(/(?:^|\s)frame=(#?[a-z0-9]+)(?:\s|$)/i)?.[1]?.toLowerCase();
+  if (name && /^#[0-9a-f]{6}$/.test(name)) return { width, frame: name as Frame };
   const frame = name ? (FRAME_ALIASES[name] ?? name) : null;
-  return { width, frame: frame && (FRAMES as readonly string[]).includes(frame) ? (frame as Frame) : null };
+  return { width, frame: frame && (FRAMES as readonly string[]).includes(frame) ? (frame as FrameName) : null };
 }
 
 export function groupImageRows(tokens: Token[]): Array<Token | Tokens.Image[]> {

@@ -11,6 +11,9 @@ import { z } from "zod";
 // modes recolor text but never images.
 
 // No .transform(): these schemas also describe the MCP tools, as JSON Schema.
+/** How tall a glow banner can be, in px of the 640px column. */
+export const BANNER_HEIGHT = { min: 50, max: 240 };
+
 const HEX = z.string().regex(/^#[0-9a-fA-F]{6}$/, "A color is a 6-digit hex value like #3557a0");
 
 // Fonts the email can use. Web fonts (a Google Fonts link) show in Apple Mail
@@ -74,11 +77,19 @@ export const themeSchema = z.object({
     rule: HEX,
   }),
   font: z.enum(Object.keys(FONTS) as [FontKey, ...FontKey[]]),
-  /** The glow banner across the top, drawn as an image in the accent colors. */
+  /** The banner across the top: a glow drawn in the accent colors, the newsletter's own picture, or none. */
   banner: z.object({
-    style: z.enum(["glow", "none"]),
-    /** 0 (faint) to 100 (strong). */
+    style: z.enum(["glow", "image", "none"]),
+    /** The glow: 0 (faint) to 100 (strong). */
     strength: z.number().int().min(0).max(100),
+    /** The glow's arrangement: 0 the classic two glows, any other number a different mix of them. */
+    pattern: z.number().int().min(0).max(9999),
+    /** The glow's height in the email's 640px column, in px. */
+    height: z.number().int().min(BANNER_HEIGHT.min).max(BANNER_HEIGHT.max),
+    /** Across the whole email, edge to edge, rather than the reading column. */
+    fullWidth: z.boolean(),
+    /** The newsletter's own banner picture (style "image"): uploaded here, like the logo. */
+    image: z.string().max(500).nullable(),
   }),
   /** The accent lines (rules) under the name and the section headings. */
   rules: z.boolean(),
@@ -116,7 +127,7 @@ export const DEFAULT_THEME: Theme = {
     rule: "#e6e2d9",
   },
   font: "sans",
-  banner: { style: "glow", strength: 60 },
+  banner: { style: "glow", strength: 60, pattern: 0, height: 100, fullWidth: false, image: null },
   rules: true,
 };
 
@@ -247,10 +258,15 @@ export function checkTheme(theme: Theme, media?: string | null): ThemeCheck {
       warnings.push(`The ${label} (${c}) is very dark: in phone dark mode the rules drawn in it will barely show on the dark background.`);
   // Site paths or the images bucket only: an image from another site would
   // tell that site who opened the email.
-  if (theme.logo && !/^\/(?!\/)/.test(theme.logo) && !(media && theme.logo.startsWith(`${media}/`)))
-    errors.push("The logo must be an image uploaded here (a path like /_emdash/api/media/file/...), not a link to another site.");
-  if (theme.logo && /\.svg(\?|$)/i.test(theme.logo))
-    warnings.push("The logo is an SVG, which Gmail and Outlook don't show: it will be missing in most inboxes. Upload a PNG instead.");
+  const local = (src: string) => /^\/(?!\/)/.test(src) || !!(media && src.startsWith(`${media}/`));
+  for (const [label, src] of [["logo", theme.logo], ["banner picture", theme.banner.image]] as const) {
+    if (src && !local(src))
+      errors.push(`The ${label} must be an image uploaded here (a path like /_emdash/api/media/file/...), not a link to another site.`);
+    if (src && /\.svg(\?|$)/i.test(src))
+      warnings.push(`The ${label} is an SVG, which Gmail and Outlook don't show: it will be missing in most inboxes. Upload a PNG or JPEG instead.`);
+  }
+  if (theme.banner.style === "image" && !theme.banner.image)
+    errors.push("The banner is set to a picture, but none is uploaded. Upload one, or pick the glow or no banner.");
   return { errors, warnings };
 }
 
@@ -259,13 +275,16 @@ export function checkTheme(theme: Theme, media?: string | null): ThemeCheck {
 const bare = (c: string) => c.slice(1).toLowerCase();
 
 /** One drawing in a theme's email: colors as 6-digit hex without "#". */
-export type ArtSpec = { kind: "glow"; a: string; b: string; strength: number } | { kind: "rule"; a: string; b: string };
+export type ArtSpec =
+  | { kind: "glow"; a: string; b: string; strength: number; pattern: number; height: number }
+  | { kind: "rule"; a: string; b: string };
 
-/** The drawings a theme's email shows: the glow unless the banner is off, and the rule unless the rules are. */
+/** The drawings a theme's email shows: the glow when the banner is one, and the rule unless the rules are off. */
 export function artSpecs(theme: Theme): ArtSpec[] {
   const [a, b] = [bare(theme.colors.accent), bare(theme.colors.accent2)];
   const specs: ArtSpec[] = [];
-  if (theme.banner.style !== "none") specs.push({ kind: "glow", a, b, strength: theme.banner.strength });
+  const { style, strength, pattern, height } = theme.banner;
+  if (style === "glow") specs.push({ kind: "glow", a, b, strength, pattern, height });
   if (theme.rules) specs.push({ kind: "rule", a, b });
   return specs;
 }
@@ -279,9 +298,10 @@ export type DrawnArt = (spec: ArtSpec) => string | undefined;
 
 /** A drawing's key in the images bucket. It names everything drawn, so what's there never changes. */
 export function artKey(spec: ArtSpec): string {
-  return spec.kind === "glow"
-    ? `email-art/glow-${spec.a}-${spec.b}-${spec.strength}.png`
-    : `email-art/rule-${spec.a}-${spec.b}.png`;
+  if (spec.kind === "rule") return `email-art/rule-${spec.a}-${spec.b}.png`;
+  // The classic glow keeps its first key, so copies already in buckets stay in use.
+  const shape = spec.pattern === 0 && spec.height === 100 ? "" : `-p${spec.pattern}-h${spec.height}`;
+  return `email-art/glow-${spec.a}-${spec.b}-${spec.strength}${shape}.png`;
 }
 
 // A drawing's address: in the images bucket when there is one (media, its
@@ -289,13 +309,26 @@ export function artKey(spec: ArtSpec): string {
 function artUrl(spec: ArtSpec, base: string, media?: string | null): string {
   if (media) return `${media}/${artKey(spec)}`;
   const q = `a=${spec.a}&b=${spec.b}`;
-  return spec.kind === "glow" ? `${base}/email/art/glow.png?${q}&s=${spec.strength}` : `${base}/email/art/rule.png?${q}`;
+  return spec.kind === "glow"
+    ? `${base}/email/art/glow.png?${q}&s=${spec.strength}&p=${spec.pattern}&h=${spec.height}`
+    : `${base}/email/art/rule.png?${q}`;
 }
 
-/** The glow banner image for a theme, or null when it has none. Its URL says everything it draws, so it never changes. */
-export function bannerUrl(theme: Theme, base: string, media?: string | null, drawn?: DrawnArt): string | null {
+/**
+ * The banner image for a theme, or null when it has none: the newsletter's
+ * own picture, or the glow, whose URL says everything it draws, so it never
+ * changes. height is the glow's in the 640px column; null for a picture,
+ * which keeps its own shape.
+ */
+export function bannerUrl(
+  theme: Theme,
+  base: string,
+  media?: string | null,
+  drawn?: DrawnArt,
+): { src: string; height: number | null } | null {
+  if (theme.banner.style === "image") return theme.banner.image ? { src: theme.banner.image, height: null } : null;
   const glow = artSpecs(theme).find((spec) => spec.kind === "glow");
-  return glow ? (drawn?.(glow) ?? artUrl(glow, base, media)) : null;
+  return glow?.kind === "glow" ? { src: drawn?.(glow) ?? artUrl(glow, base, media), height: glow.height } : null;
 }
 
 /** The accent-to-accent2 rule image, or null when the theme has no rules. */

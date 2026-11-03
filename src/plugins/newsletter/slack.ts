@@ -1,4 +1,5 @@
 import { Marked } from "marked";
+import { styledText } from "./styling.ts";
 
 // Markdown Slack TL;DR -> rich HTML for pasting into a Slack channel.
 //
@@ -22,6 +23,8 @@ export interface RenderSlackOptions {
 
 export function renderSlack(markdown: string, options: RenderSlackOptions): string {
   const md = new Marked({ breaks: true });
+  // Styled words keep just their words: Slack has no colors.
+  md.use(styledText());
   md.use({
     renderer: {
       heading({ tokens }) {

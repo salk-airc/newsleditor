@@ -19,13 +19,24 @@ import { yCollab, yUndoManagerKeymap } from "y-codemirror.next";
 import { WebsocketProvider } from "y-websocket";
 import * as Y from "yjs";
 import { joinedToBullet, placeholders, wordCount } from "../plugins/newsletter/checks.ts";
-import { type Frame, imageHints } from "../plugins/newsletter/email.ts";
+import { type Frame, type FrameName, imageHints } from "../plugins/newsletter/email.ts";
 import { frameColors, renderDesignedEmail } from "../plugins/newsletter/email-designed.ts";
 import { formatDate } from "../plugins/newsletter/editions.ts";
 import { DEFAULT_SETTINGS, type Settings } from "../plugins/newsletter/settings.ts";
-import { DEFAULT_THEME, type Theme } from "../plugins/newsletter/theme.ts";
+import { BANNER_HEIGHT, DEFAULT_THEME, type Theme } from "../plugins/newsletter/theme.ts";
 import { plugin, uploadImage as upload } from "./emdash-api.ts";
 import { renderSlack } from "../plugins/newsletter/slack.ts";
+import {
+  markColor,
+  NO_STYLING,
+  parseStyling,
+  STYLED,
+  type Styling,
+  stylingSpec,
+  textColor,
+  type TextColor,
+  type TextMark,
+} from "../plugins/newsletter/styling.ts";
 import { renderWeb } from "../plugins/newsletter/web.ts";
 import editionCss from "../styles/edition-body.css?inline";
 import { merge, setText } from "./merge.ts";
@@ -206,7 +217,10 @@ export async function startEditor(root: HTMLElement): Promise<void> {
       drop: (e, v) => insertImages(v, e.dataTransfer?.files, v.posAtCoords({ x: e.clientX, y: e.clientY }), e),
     }),
     EditorView.updateListener.of((u) => {
-      if (u.docChanged || u.selectionSet) showImageBar(u.view);
+      if (u.docChanged || u.selectionSet) {
+        showImageBar(u.view);
+        showTextBar(u.view);
+      }
     }),
     EditorView.theme({
       "&": { backgroundColor: "transparent", color: "var(--ink)" },
@@ -308,6 +322,8 @@ export async function startEditor(root: HTMLElement): Promise<void> {
   const widthInput = $<HTMLInputElement>("[data-image-width]");
   const widthOut = $<HTMLOutputElement>("[data-image-width-out]");
   const captionInput = $<HTMLInputElement>("[data-image-caption]");
+  const frameCustom = $<HTMLInputElement>("[data-frame-custom]");
+  const frameWheel = frameCustom.closest("label")!;
   let current: ImageRef | null = null;
 
   // The image the cursor is in, or the first one on the cursor's line.
@@ -338,6 +354,10 @@ export async function startEditor(root: HTMLElement): Promise<void> {
     imageBar.querySelectorAll<HTMLButtonElement>("[data-frame]").forEach((b) => {
       b.setAttribute("aria-pressed", String(b.dataset.frame === (current!.frame ?? "accent")));
     });
+    // A frame in its own color rings the wheel, which starts from that color.
+    const own = current.frame?.startsWith("#") ? current.frame : null;
+    frameWheel.classList.toggle("is-picked", !!own);
+    if (own && document.activeElement !== frameCustom) frameCustom.value = own;
   }
 
   // Rewrites the image under the bar, as one ordinary (undoable) edit.
@@ -358,7 +378,7 @@ export async function startEditor(root: HTMLElement): Promise<void> {
   function paintSwatches() {
     const colors = frameColors(theme);
     imageBar.querySelectorAll<HTMLButtonElement>("[data-frame]").forEach((b) => {
-      const color = colors[b.dataset.frame as Frame];
+      const color = colors[b.dataset.frame as FrameName];
       if (color) b.style.setProperty("--swatch", color);
     });
   }
@@ -369,6 +389,9 @@ export async function startEditor(root: HTMLElement): Promise<void> {
     });
   });
   paintSwatches();
+  // Any frame color, live as the picker moves (the editor keeps its cursor
+  // without taking focus, which would close the picker).
+  frameCustom.addEventListener("input", () => writeImage({ frame: frameCustom.value.toLowerCase() as Frame }));
 
   imageBar.querySelectorAll<HTMLButtonElement>("[data-size]").forEach((b) =>
     b.addEventListener("click", () => {
@@ -384,6 +407,221 @@ export async function startEditor(root: HTMLElement): Promise<void> {
   captionInput.addEventListener("keydown", (e) => {
     if (e.key === "Enter") editor.focus();
   });
+
+  // ----------------------------------------------------------- text bar --
+
+  // With words selected in the email's text (or the cursor in words already
+  // styled), a bar over the editor makes them bold or italic, or colors,
+  // highlights or resizes them. Styles are written into the markdown as
+  // [the words]{accent mark big} (src/plugins/newsletter/styling.ts), which
+  // only the designed email paints; the rest keep the words.
+
+  const textBar = $<HTMLElement>("[data-textbar]");
+  const customColor = $<HTMLInputElement>("[data-text-color-custom]");
+
+  interface StyledRef {
+    from: number;
+    to: number;
+    words: string;
+    styling: Styling;
+  }
+  /** The styled words the selection is in, if it's all inside one. */
+  let styled: StyledRef | null = null;
+
+  function styledAt(v: EditorView): StyledRef | null {
+    const { from, to } = v.state.selection.main;
+    const line = v.state.doc.lineAt(from);
+    if (to > line.to) return null;
+    for (const m of line.text.matchAll(STYLED)) {
+      const start = line.from + m.index!;
+      const end = start + m[0].length;
+      if (from >= start && to <= end) return { from: start, to: end, words: m[1]!, styling: parseStyling(m[2]!) };
+    }
+    return null;
+  }
+
+  const toolbarNote = $<HTMLElement>("[data-toolbar-note]");
+  function showTextBar(v: EditorView) {
+    const sel = v.state.selection.main;
+    styled = styledAt(v);
+    // The image bar has the row on an image's line; the Slack post has no styles.
+    textBar.hidden = doc !== "body" || !imageBar.hidden;
+    toolbarNote.hidden = doc === "body";
+    if (textBar.hidden) return;
+    // Always there, so the text never moves; usable once there's something to style.
+    const off = sel.empty && !styled;
+    // Lists work on the cursor's line too.
+    textBar.querySelectorAll<HTMLButtonElement>("button:not([data-text-list])").forEach((b) => (b.disabled = off));
+    customColor.disabled = off;
+    const kind = listKind(v);
+    textBar.querySelectorAll<HTMLButtonElement>("[data-text-list]").forEach((b) => {
+      b.setAttribute("aria-pressed", String(b.dataset.textList === kind));
+    });
+    const s = styled?.styling ?? NO_STYLING;
+    const press = (attr: string, value: string | null) =>
+      textBar.querySelectorAll<HTMLButtonElement>(`[${attr}]`).forEach((b) => {
+        b.setAttribute("aria-pressed", String(b.getAttribute(attr) === (value ?? "")));
+      });
+    press("data-text-color", s.color);
+    press("data-text-mark", s.mark);
+    press("data-text-size", s.size);
+    $<HTMLButtonElement>("[data-text-underline]").setAttribute("aria-pressed", String(s.underline));
+    if (s.color?.startsWith("#")) customColor.value = s.color;
+  }
+
+  /**
+   * Changes the selected words' styles, as one undoable edit: rewrites the
+   * styled words the selection is in, or wraps the selection in new ones.
+   * The words stay selected, so another style can follow.
+   */
+  function restyle(change: Partial<Styling>, { focus = true } = {}) {
+    const sel = editor.state.selection.main;
+    const ref: StyledRef | null =
+      styled ?? (sel.empty ? null : { from: sel.from, to: sel.to, words: editor.state.sliceDoc(sel.from, sel.to), styling: NO_STYLING });
+    if (!ref) return;
+    if (/[\n[\]]/.test(ref.words)) {
+      setStatus("Style a part of one line at a time, without a link in it.", "error");
+      return;
+    }
+    const spec = stylingSpec({ ...ref.styling, ...change });
+    const insert = spec ? `[${ref.words}]{${spec}}` : ref.words;
+    const start = ref.from + (spec ? 1 : 0);
+    editor.dispatch({
+      changes: { from: ref.from, to: ref.to, insert },
+      selection: { anchor: start, head: start + ref.words.length },
+    });
+    if (focus) editor.focus();
+  }
+
+  /** Bold (**) or italic (*): takes the marks off when the selection already has them, else puts them on. */
+  function toggleWrap(mark: string) {
+    const sel = editor.state.selection.main;
+    if (sel.empty) return;
+    const n = mark.length;
+    const words = editor.state.sliceDoc(sel.from, sel.to);
+    const around = editor.state.sliceDoc(sel.from - n, sel.from) === mark && editor.state.sliceDoc(sel.to, sel.to + n) === mark;
+    // Italic's * isn't one side of a bold's **.
+    const single = n > 1 || (editor.state.sliceDoc(sel.from - 2, sel.from) !== "**" && editor.state.sliceDoc(sel.to, sel.to + 2) !== "**");
+    if (around && single) {
+      editor.dispatch({
+        changes: [
+          { from: sel.from - n, to: sel.from, insert: "" },
+          { from: sel.to, to: sel.to + n, insert: "" },
+        ],
+        selection: { anchor: sel.from - n, head: sel.to - n },
+      });
+    } else {
+      // Spaces at the edges stay outside the marks, or markdown won't see them.
+      const lead = words.length - words.trimStart().length;
+      const trail = words.length - words.trimEnd().length;
+      const from = sel.from + lead;
+      const to = sel.to - trail;
+      if (from >= to) return;
+      editor.dispatch({
+        changes: [
+          { from, insert: mark },
+          { from: to, insert: mark },
+        ],
+        selection: { anchor: from + n, head: to + n },
+      });
+    }
+    editor.focus();
+  }
+
+  // Bullets and numbering, on every line the selection touches (or the
+  // cursor's): "- " or "1. ", "2. "…; clicked when the lines already are that
+  // kind of list, the markers come off. Blank lines are left alone.
+  const LIST_MARK = /^(\s*)(?:[-*+]|\d+[.)])\s+/;
+  type ListKind = "bullet" | "number";
+  function selectedLines(v: EditorView) {
+    const { from, to } = v.state.selection.main;
+    const lines = [];
+    for (let n = v.state.doc.lineAt(from).number; n <= v.state.doc.lineAt(to).number; n++) lines.push(v.state.doc.line(n));
+    return lines.filter((l) => l.text.trim());
+  }
+  /** The kind of list every selected line is in, if they're all one. */
+  function listKind(v: EditorView): ListKind | null {
+    const lines = selectedLines(v);
+    if (!lines.length) return null;
+    if (lines.every((l) => /^\s*[-*+]\s/.test(l.text))) return "bullet";
+    if (lines.every((l) => /^\s*\d+[.)]\s/.test(l.text))) return "number";
+    return null;
+  }
+  function toggleList(kind: ListKind) {
+    const lines = selectedLines(editor);
+    if (!lines.length) return;
+    const off = listKind(editor) === kind;
+    editor.dispatch({
+      changes: lines.map((l, i) => {
+        const m = LIST_MARK.exec(l.text);
+        const indent = m?.[1] ?? l.text.match(/^\s*/)![0];
+        const marker = off ? "" : kind === "bullet" ? "- " : `${i + 1}. `;
+        return { from: l.from, to: l.from + (m ? m[0].length : indent.length), insert: indent + marker };
+      }),
+    });
+    editor.focus();
+  }
+  textBar.querySelectorAll<HTMLButtonElement>("[data-text-list]").forEach((b) =>
+    b.addEventListener("click", () => toggleList(b.dataset.textList as ListKind)),
+  );
+
+  textBar.querySelectorAll<HTMLButtonElement>("[data-text-wrap]").forEach((b) =>
+    b.addEventListener("click", () => toggleWrap(b.dataset.textWrap!)),
+  );
+  // A swatch puts its color on; clicked again (it's pressed), it takes it off.
+  const toggled = (b: HTMLButtonElement, value: string) => (b.getAttribute("aria-pressed") === "true" ? null : value);
+  textBar.querySelectorAll<HTMLButtonElement>("[data-text-color]").forEach((b) =>
+    b.addEventListener("click", () => restyle({ color: toggled(b, b.dataset.textColor!) as TextColor | null })),
+  );
+  textBar.querySelectorAll<HTMLButtonElement>("[data-text-mark]").forEach((b) =>
+    b.addEventListener("click", () => restyle({ mark: toggled(b, b.dataset.textMark!) as TextMark | null })),
+  );
+  const underline = $<HTMLButtonElement>("[data-text-underline]");
+  underline.addEventListener("click", () => restyle({ underline: underline.getAttribute("aria-pressed") !== "true" }));
+  textBar.querySelectorAll<HTMLButtonElement>("[data-text-size]").forEach((b) =>
+    b.addEventListener("click", () => restyle({ size: (b.dataset.textSize || null) as Styling["size"] })),
+  );
+  // Live as the picker moves, so the words and the preview follow it. The
+  // editor keeps its selection without taking focus, which would close the
+  // picker; edits this close together undo as one.
+  customColor.addEventListener("input", () =>
+    restyle({ color: customColor.value.toLowerCase() as TextColor }, { focus: false }),
+  );
+  $<HTMLButtonElement>("[data-text-clear]").addEventListener("click", () => restyle(NO_STYLING));
+
+  /** The text bar's swatches in the theme's colors (again once the theme has loaded). */
+  function paintTextSwatches() {
+    const p = theme.colors;
+    textBar.querySelectorAll<HTMLButtonElement>("[data-text-color]").forEach((b) => {
+      b.style.setProperty("--swatch", textColor(b.dataset.textColor as TextColor, p));
+    });
+    textBar.querySelectorAll<HTMLButtonElement>("[data-text-mark]").forEach((b) => {
+      b.style.setProperty("--swatch", markColor(b.dataset.textMark as TextMark, p));
+    });
+  }
+  paintTextSwatches();
+  showImageBar(editor);
+  showTextBar(editor);
+
+  // Undo and redo buttons, for those who don't know ⌘Z: the same as the
+  // keys, so they undo only your own edits in the text being edited.
+  const undoButton = $<HTMLButtonElement>("[data-undo]");
+  const redoButton = $<HTMLButtonElement>("[data-redo]");
+  function showHistory() {
+    undoButton.disabled = !undo[doc].canUndo();
+    redoButton.disabled = !undo[doc].canRedo();
+  }
+  for (const u of Object.values(undo))
+    for (const event of ["stack-item-added", "stack-item-popped", "stack-cleared"] as const) u.on(event, showHistory);
+  undoButton.addEventListener("click", () => {
+    undo[doc].undo();
+    editor.focus();
+  });
+  redoButton.addEventListener("click", () => {
+    undo[doc].redo();
+    editor.focus();
+  });
+  showHistory();
 
   // ------------------------------------------------------------ cropper --
 
@@ -574,7 +812,63 @@ export async function startEditor(root: HTMLElement): Promise<void> {
   preview.addEventListener("load", () => {
     frameLoading = false;
     preview.contentWindow?.scrollTo(0, scrollY);
+    wireBanner();
   });
+
+  // ------------------------------------------------- banner, by dragging --
+
+  // In the email preview, a glow banner's bottom edge can be dragged to make
+  // it taller or shorter. The height is the theme's, so letting go saves it
+  // for every edition (like the Theme page's Height slider). Listeners sit on
+  // the frame's document, which outlives the body swapped in on each render;
+  // a full load makes a new one, wired again on load.
+  const EDGE = 10; // px from the banner's bottom that start a drag
+  const wired = new WeakSet<Document>();
+  function wireBanner() {
+    const page = preview.contentDocument;
+    if (!page || wired.has(page)) return;
+    wired.add(page);
+    const banner = () => (theme.banner.style === "glow" ? page.querySelector<HTMLImageElement>("img[data-banner]") : null);
+    const onEdge = (img: HTMLImageElement, y: number) => Math.abs(img.getBoundingClientRect().bottom - y) <= EDGE;
+    let drag: { img: HTMLImageElement; y: number; height: number; scale: number; next: number } | null = null;
+
+    page.addEventListener("pointermove", (e) => {
+      const img = banner();
+      if (drag) {
+        const raw = drag.height + (e.clientY - drag.y) / drag.scale;
+        drag.next = Math.round(Math.min(BANNER_HEIGHT.max, Math.max(BANNER_HEIGHT.min, raw)) / 5) * 5;
+        // The drawn glow stretches until it's drawn at the new height, on letting go.
+        drag.img.style.height = `${drag.next * drag.scale}px`;
+        setStatus(`Banner ${drag.next}px tall`, "busy");
+        return;
+      }
+      page.documentElement.style.cursor = img && onEdge(img, e.clientY) ? "ns-resize" : "";
+    });
+    page.addEventListener("pointerdown", (e) => {
+      const img = banner();
+      if (!img || !onEdge(img, e.clientY)) return;
+      e.preventDefault();
+      page.documentElement.setPointerCapture(e.pointerId);
+      drag = { img, y: e.clientY, height: theme.banner.height, scale: img.clientHeight / theme.banner.height, next: theme.banner.height };
+    });
+    page.addEventListener("pointerup", async () => {
+      if (!drag) return;
+      const height = drag.next;
+      const changed = height !== theme.banner.height;
+      drag = null;
+      page.documentElement.style.cursor = "";
+      if (!changed) return showSaveState();
+      theme = { ...theme, banner: { ...theme.banner, height } };
+      render();
+      try {
+        const r = await plugin<{ saved: boolean; theme: Theme }>("theme-update", { patch: { banner: { height } } });
+        if (r.saved) theme = r.theme;
+        setStatus(r.saved ? `Banner height saved (${height}px), for every edition` : "Banner height not saved", r.saved ? "ok" : "error");
+      } catch (err) {
+        setStatus(`Banner height not saved: ${(err as Error).message}`, "error");
+      }
+    });
+  }
 
   function render() {
     // The inbox isn't a render of the text; the frame catches up when a
@@ -855,6 +1149,7 @@ export async function startEditor(root: HTMLElement): Promise<void> {
     doc = next;
     select("data-doc", doc);
     editor.setState(stateFor(doc));
+    showHistory();
     editor.dispatch({ selection: { anchor: Math.min(lastPos[doc], editor.state.doc.length) }, scrollIntoView: true });
     // Editing the Slack post shows the Slack preview, and back (the inbox
     // stays open if that's what's showing).
@@ -934,6 +1229,7 @@ export async function startEditor(root: HTMLElement): Promise<void> {
           () => false,
         );
       paintSwatches();
+      paintTextSwatches();
       render();
     } catch {
       // Keeps the defaults: the preview still works, just not in the saved theme.

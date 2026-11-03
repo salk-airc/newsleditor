@@ -109,8 +109,11 @@ export function startThemeEditor(root: HTMLElement) {
     accentChoices(words(t.nameTail).length);
     for (const name of ["footer", "wordmark", "tagline", "font"] as const) text(name).value = t[name];
     setColors(t.colors);
-    $<HTMLInputElement>("[data-banner-on]").checked = t.banner.style === "glow";
+    $<HTMLSelectElement>("[data-banner-style]").value = t.banner.style;
     $<HTMLInputElement>("[data-banner-strength]").value = String(t.banner.strength);
+    $<HTMLInputElement>("[data-banner-height]").value = String(t.banner.height);
+    $<HTMLInputElement>("[data-banner-full]").checked = t.banner.fullWidth;
+    showBanner(t.banner);
     $<HTMLInputElement>("[data-rules-on]").checked = t.rules;
     showLogo(t.logo);
   }
@@ -131,8 +134,12 @@ export function startThemeEditor(root: HTMLElement) {
       font: text("font").value as Theme["font"],
       colors,
       banner: {
-        style: $<HTMLInputElement>("[data-banner-on]").checked ? "glow" : "none",
+        // The pattern and the picture are set by their buttons, on the theme itself.
+        ...theme.banner,
+        style: $<HTMLSelectElement>("[data-banner-style]").value as Theme["banner"]["style"],
         strength: Number($<HTMLInputElement>("[data-banner-strength]").value),
+        height: Number($<HTMLInputElement>("[data-banner-height]").value),
+        fullWidth: $<HTMLInputElement>("[data-banner-full]").checked,
       },
       rules: $<HTMLInputElement>("[data-rules-on]").checked,
     };
@@ -156,6 +163,48 @@ export function startThemeEditor(root: HTMLElement) {
     if (src) logoImg.src = src;
     logoPalette(src);
   }
+
+  // -------------------------------------------------------------- banner --
+
+  const bannerImg = $<HTMLImageElement>("[data-banner-img]");
+  const bannerNone = $<HTMLElement>("[data-banner-none]");
+
+  /** Shows the controls for the banner's style, its picture, and which pattern the glow is. */
+  function showBanner(b: Theme["banner"]) {
+    for (const part of root.querySelectorAll<HTMLElement>("[data-banner-part]"))
+      part.hidden = !part.dataset.bannerPart!.split(" ").includes(b.style);
+    bannerImg.hidden = !b.image;
+    bannerNone.hidden = !!b.image;
+    if (b.image) bannerImg.src = b.image;
+    $<HTMLElement>("[data-banner-pattern-name]").textContent = b.pattern === 0 ? "classic" : `no. ${b.pattern}`;
+  }
+
+  const setBanner = (change: Partial<Theme["banner"]>) => {
+    const t = read();
+    theme = { ...t, banner: { ...t.banner, ...change } };
+    // The style is read back from its menu, so it follows.
+    $<HTMLSelectElement>("[data-banner-style]").value = theme.banner.style;
+    update();
+  };
+  $<HTMLButtonElement>("[data-banner-shuffle]").addEventListener("click", () => {
+    let pattern = theme.banner.pattern;
+    while (pattern === theme.banner.pattern) pattern = 1 + Math.floor(Math.random() * 9999);
+    setBanner({ pattern });
+  });
+  $<HTMLButtonElement>("[data-banner-classic]").addEventListener("click", () => setBanner({ pattern: 0 }));
+  $<HTMLInputElement>("[data-banner-file]").addEventListener("change", async (e) => {
+    const input = e.target as HTMLInputElement;
+    const file = input.files?.[0];
+    input.value = "";
+    if (!file) return;
+    status.textContent = "Uploading the banner picture…";
+    try {
+      setBanner({ image: await uploadImage(file, "banner"), style: "image" });
+      status.textContent = "";
+    } catch (err) {
+      status.textContent = `Banner picture not uploaded: ${(err as Error).message}`;
+    }
+  });
 
   // ------------------------------------------------------------ palettes --
 
@@ -223,6 +272,7 @@ export function startThemeEditor(root: HTMLElement) {
 
   function update() {
     theme = read();
+    showBanner(theme.banner);
     // The dropdown shows its font in that font, and what Outlook shows instead.
     const font = FONTS[theme.font];
     fontSelect.style.fontFamily = font.stack;

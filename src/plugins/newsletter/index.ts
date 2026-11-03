@@ -579,14 +579,14 @@ export function createPlugin() {
         },
         theme_get: {
           description:
-            "The newsletter's theme: its name, logo, wordmark, tagline, footer, colors, font and glow banner, with any readability problems. Read it before changing the theme.",
+            "The newsletter's theme: its name, logo, wordmark, tagline, footer, colors, font and banner, with any readability problems. Read it before changing the theme.",
           route: "theme-get",
           input: noInput,
           output: themeGetOutput,
         },
         theme_update: {
           description:
-            "Change the newsletter's theme when the user asks for new branding. Pass only what changes. Email limits apply: the page must be light, text (ink) near-black so phone dark modes turn it white, and the accents deep enough to read as link text; the glow banner and rules are drawn as images from accent and accent2, so gradients aren't set directly; rules: false removes the lines under the name and headings. A logo must be on this site: media_upload it and use the path it returns (/_emdash/api/media/file/...), ideally a transparent PNG; links to other sites are refused. If the result would be hard to read, nothing is saved and saved is false: tell the user the errors and suggest a fix. Tell them any warnings too.",
+            "Change the newsletter's theme when the user asks for new branding. Pass only what changes. Email limits apply: the page must be light, text (ink) near-black so phone dark modes turn it white, and the accents deep enough to read as link text; the glow banner and rules are drawn as images from accent and accent2, so gradients aren't set directly; rules: false removes the lines under the name and headings. The banner: style glow, image (the newsletter's own picture in banner.image) or none; for the glow, strength 0-100, pattern (0 the classic two glows, any other number up to 9999 a different arrangement, to try a new look) and height (50-240px); fullWidth: true runs it edge to edge instead of across the reading column. A logo or banner picture must be on this site: media_upload it and use the path it returns (/_emdash/api/media/file/...), a transparent PNG for a logo, a wide PNG or JPEG for a banner; links to other sites are refused. If the result would be hard to read, nothing is saved and saved is false: tell the user the errors and suggest a fix. Tell them any warnings too.",
           route: "theme-update",
           input: themeUpdateInput,
           output: themeUpdateOutput,

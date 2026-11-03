@@ -1,5 +1,6 @@
 import { Marked, type Token, type Tokens } from "marked";
-import { type Frame, groupImageRows, imageHints, PLACEHOLDER, signatureHtml } from "./email.ts";
+import { type FrameName, groupImageRows, imageHints, PLACEHOLDER, signatureHtml } from "./email.ts";
+import { styledText, stylingCss } from "./styling.ts";
 import { DEFAULT_THEME, bannerUrl, type DrawnArt, FONTS, mix, rgb, ruleUrl, type Theme } from "./theme.ts";
 
 // Markdown edition body -> the designed newsletter email, in the newsletter's
@@ -63,14 +64,14 @@ interface Style {
   alpha: (color: string, a: number) => string;
   tint: string;
   tint2: string;
-  frames: Record<Frame, string | null>;
+  frames: Record<FrameName, string | null>;
   ruleImg: (width: number) => string;
   site: string;
   media: string | null;
 }
 
 /** An image frame's color in a theme (null: no frame). Solid colors: the accents at ~30% on white, and a stone grey. */
-export function frameColors(theme: Theme): Record<Frame, string | null> {
+export function frameColors(theme: Theme): Record<FrameName, string | null> {
   const { accent, accent2 } = theme.colors;
   return { accent: mix(accent, "#ffffff", 0.3), accent2: mix(accent2, "#ffffff", 0.3), grey: "#dcd8cf", none: null };
 }
@@ -109,6 +110,9 @@ export function renderDesignedEmail(markdown: string, options: RenderDesignedEma
   const s = style(options.theme ?? DEFAULT_THEME, options.site, options.media ?? null, options.drawn);
   const P = `${s.font}; font-size:16px; line-height:1.7; color:${s.ink}; margin:0 0 18px`;
   const md = new Marked();
+
+  // Words styled in the editor's text bar, in the theme's colors.
+  md.use(styledText((t) => stylingCss(t, s)));
 
   md.use({
     renderer: {
@@ -151,7 +155,8 @@ export function renderDesignedEmail(markdown: string, options: RenderDesignedEma
         return `<table cellpadding="0" cellspacing="0" role="presentation" style="border-collapse:collapse; margin:4px 0 16px; width:100%">${rows}</table>\n`;
       },
       strong({ tokens }) {
-        return `<b style="color:${s.ink}; font-weight:600">${this.parser.parseInline(tokens)}</b>`;
+        // The color of what it's in: the text's, or styled words' own.
+        return `<b style="font-weight:600">${this.parser.parseInline(tokens)}</b>`;
       },
       link({ href, tokens }) {
         return (
@@ -192,7 +197,13 @@ export function renderDesignedEmail(markdown: string, options: RenderDesignedEma
   const column = (padding: string, inner: string) =>
     `<table cellpadding="0" cellspacing="0" role="presentation" style="width:100%; max-width:640px">` +
     `<tr><td style="padding:${padding}">${inner}</td></tr></table>`;
-  const banner = bannerUrl(s.theme, s.site, s.media, options.drawn);
+  const found = bannerUrl(s.theme, s.site, s.media, options.drawn);
+  const banner = found && {
+    ...found,
+    src: found.height === null ? new URL((options.resolveImage ?? ((src) => src))(found.src), s.site).href : found.src,
+  };
+  // The masthead sits a little into a glow; a picture keeps its own space.
+  const glowAbove = banner !== null && banner.height !== null;
   const fontLink = FONTS[s.theme.font].link;
 
   return (
@@ -205,17 +216,13 @@ export function renderDesignedEmail(markdown: string, options: RenderDesignedEma
     // No card: the page color runs edge to edge, as in Bloom's emails, and
     // the text sits in a centred column.
     `<table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="background-color:${s.page}">` +
+    // Across the whole email: the banner gets its own row, edge to edge.
+    (banner && s.theme.banner.fullWidth ? `<tr><td style="padding:0">${bannerImg(banner, true)}</td></tr>` : "") +
     `<tr><td align="center" style="padding:0 12px">` +
-    // The glow is a picture at the top of the column, faded to the page
-    // color at its edges; the masthead under it stays real text.
-    (banner
-      ? column(
-          "0",
-          `<img alt="" src="${escapeAttr(banner)}" width="640" height="100" ` +
-            `style="display:block; width:100%; max-width:640px; height:auto; border:0">`,
-        )
-      : "") +
-    `${column(banner ? "0 28px 30px" : "34px 28px 30px", masthead(s, options, sections, banner !== null))}</td></tr>` +
+    // The banner is a picture at the top of the column (the glow faded to
+    // the page color at its edges); the masthead under it stays real text.
+    (banner && !s.theme.banner.fullWidth ? column("0", bannerImg(banner, false)) : "") +
+    `${column(glowAbove ? "0 28px 30px" : banner ? "26px 28px 30px" : "34px 28px 30px", masthead(s, options, sections, glowAbove))}</td></tr>` +
     `<tr><td align="center" style="padding:0 12px">` +
     `${column("8px 28px 32px", `\n${body}${signature}\n`)}` +
     (s.theme.footer
@@ -226,6 +233,22 @@ export function renderDesignedEmail(markdown: string, options: RenderDesignedEma
       : "") +
     `</td></tr></table></body></html>`
   );
+}
+
+/**
+ * The banner picture. A glow is drawn for the 640px column at its height:
+ * edge to edge it stretches sideways and keeps that height, which a soft glow
+ * doesn't mind. A picture keeps its own shape. data-banner marks it for the
+ * studio's preview, where it can be dragged taller or shorter.
+ */
+function bannerImg(banner: { src: string; height: number | null }, full: boolean): string {
+  const size =
+    banner.height === null
+      ? `width="640" style="display:block; width:100%; ${full ? "" : "max-width:640px; "}height:auto; border:0"`
+      : full
+        ? `width="640" height="${banner.height}" style="display:block; width:100%; height:${banner.height}px; border:0"`
+        : `width="640" height="${banner.height}" style="display:block; width:100%; max-width:640px; height:auto; border:0"`;
+  return `<img alt="" data-banner src="${escapeAttr(banner.src)}" ${size}>`;
 }
 
 function masthead(s: Style, options: RenderDesignedEmailOptions, sections: string[], underBanner: boolean): string {
@@ -306,7 +329,8 @@ function imageRow(s: Style, images: Tokens.Image[], resolveImage: (src: string) 
     .map((img) => {
       const hints = imageHints(img.title);
       const width = hints.width ?? fallback;
-      const frame = s.frames[hints.frame ?? "accent"];
+      // A named frame in the theme's colors, or the color it was given.
+      const frame = hints.frame?.startsWith("#") ? hints.frame : s.frames[(hints.frame as FrameName | null) ?? "accent"];
       const tag =
         `<img alt="${escapeAttr(img.text)}" src="${escapeAttr(resolveImage(img.href))}" width="${width}" ` +
         `style="display:block; width:${width}px; max-width:100%; height:auto; border:0; border-radius:10px">`;

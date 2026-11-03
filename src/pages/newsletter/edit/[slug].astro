@@ -67,6 +67,12 @@ const inboxSince = previous?.date.toISOString() ?? "";
               Slack post
             </button>
           </div>
+          {/* One toolbar row, always there so the text under it never moves: the text tools, or the image tools on an image's line. */}
+          <div class="toolbar">
+          <div class="toolbar__history" role="group" aria-label="Undo and redo">
+            <button type="button" data-undo title="Undo (⌘Z)" aria-label="Undo">↶</button>
+            <button type="button" data-redo title="Redo (⇧⌘Z)" aria-label="Redo">↷</button>
+          </div>
           <div class="imagebar" data-imagebar hidden>
             <span class="imagebar__label">Image</span>
             <div class="imagebar__sizes" role="group" aria-label="Size">
@@ -84,9 +90,46 @@ const inboxSince = previous?.date.toISOString() ?? "";
               <button type="button" data-frame="accent2" title="Second accent frame" aria-label="Second accent frame" />
               <button type="button" data-frame="grey" title="Grey frame" aria-label="Grey frame" />
               <button type="button" data-frame="none" title="No frame" aria-label="No frame" />
+              <label class="textbar__custom" title="Any frame color">
+                <input type="color" data-frame-custom aria-label="Any frame color" />
+              </label>
             </div>
             <input class="imagebar__caption" type="text" data-image-caption placeholder="Caption (also the alt text)" aria-label="Caption" />
             <button type="button" class="imagebar__edit" data-image-edit>Crop &amp; rotate</button>
+          </div>
+          <div class="imagebar textbar" data-textbar hidden>
+            <span class="imagebar__label">Text</span>
+            <div class="imagebar__sizes" role="group" aria-label="Bold and italic">
+              <button type="button" data-text-wrap="**" title="Bold" aria-label="Bold"><b>B</b></button>
+              <button type="button" data-text-wrap="*" title="Italic" aria-label="Italic"><i>I</i></button>
+              <button type="button" data-text-underline title="Underline" aria-label="Underline"><u>U</u></button>
+            </div>
+            <div class="imagebar__sizes" role="group" aria-label="Lists">
+              <button type="button" data-text-list="bullet" title="Bullets" aria-label="Bullets">•≡</button>
+              <button type="button" data-text-list="number" title="Numbering" aria-label="Numbering">1≡</button>
+            </div>
+            {/* A swatch puts its color on, and clicked again takes it off. */}
+            <div class="imagebar__frames" role="group" aria-label="Color">
+              <button type="button" data-text-color="accent" title="Accent" aria-label="Accent" />
+              <button type="button" data-text-color="accent2" title="Second accent" aria-label="Second accent" />
+              <button type="button" data-text-color="muted" title="Muted" aria-label="Muted" />
+              <label class="textbar__custom" title="Any color">
+                <input type="color" data-text-color-custom aria-label="Any color" />
+              </label>
+            </div>
+            <div class="imagebar__frames textbar__marks" role="group" aria-label="Highlight">
+              <button type="button" data-text-mark="mark" title="Yellow highlight" aria-label="Yellow highlight" />
+              <button type="button" data-text-mark="mark-accent" title="Accent highlight" aria-label="Accent highlight" />
+              <button type="button" data-text-mark="mark-accent2" title="Second accent highlight" aria-label="Second accent highlight" />
+            </div>
+            <div class="imagebar__sizes" role="group" aria-label="Size">
+              <button type="button" data-text-size="small" title="Small">A−</button>
+              <button type="button" data-text-size="" title="Normal">A</button>
+              <button type="button" data-text-size="big" title="Big">A+</button>
+            </div>
+            <button type="button" data-text-clear>Clear style</button>
+          </div>
+          <p class="toolbar__note" data-toolbar-note hidden>Styling is for the email. The Slack post keeps plain text.</p>
           </div>
           <div class="source" data-source />
           <ul class="checks" data-checks aria-live="polite" />
@@ -299,16 +342,85 @@ const inboxSince = previous?.date.toISOString() ?? "";
     display: none;
   }
 
-  /* Shown while the cursor is on an image in the markdown. */
-  .imagebar {
+  /* The row over the editor: always the same height, so showing the image
+     tools or enabling the text tools never moves the text. */
+  .toolbar {
+    height: 3.6rem;
     display: flex;
-    flex-wrap: wrap;
     align-items: center;
-    gap: 0.5rem 0.75rem;
-    padding: 0.45rem 0.75rem;
     border-bottom: 1px solid var(--rule);
+  }
+
+  /* Undo and redo stay at the start of the row, whichever tools follow. */
+  .toolbar__history {
+    flex: none;
+    display: flex;
+    gap: 0.15rem;
+    padding: 0 0.5rem 0 0.75rem;
+    border-right: 1px solid var(--rule);
+  }
+
+  .toolbar__history button {
+    font: inherit;
+    font-size: 1rem;
+    line-height: 1;
+    border: 1px solid var(--rule-strong);
+    border-radius: 6px;
+    padding: 0.25rem 0.5rem;
+    cursor: pointer;
+    background: var(--stone);
+    color: var(--ink);
+  }
+
+  .toolbar__history button:hover:not(:disabled) {
+    background: var(--stone-sunk);
+  }
+
+  .toolbar__history button:disabled {
+    opacity: 0.4;
+    cursor: default;
+  }
+
+  .toolbar > .imagebar,
+  .toolbar > .toolbar__note {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .toolbar__note {
+    margin: 0;
+    padding: 0.75rem;
     font-size: 0.8rem;
     color: var(--ink-soft);
+  }
+
+  /* The image tools, while the cursor is on an image; else the text tools. */
+  /* One line, scrolling sideways in a narrow pane: wrapping would make the
+     two bars different heights, and the text jump between them. */
+  .imagebar {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.45rem 0.75rem;
+    overflow-x: auto;
+    white-space: nowrap;
+    scrollbar-width: thin;
+    font-size: 0.8rem;
+    color: var(--ink-soft);
+  }
+
+  .imagebar > * {
+    flex: none;
+  }
+
+  .textbar button:disabled,
+  .textbar:has(button:disabled) .textbar__custom {
+    opacity: 0.4;
+    cursor: default;
+  }
+
+  .textbar:has(button:disabled) .textbar__custom input {
+    pointer-events: none;
   }
 
   .imagebar[hidden] {
@@ -367,6 +479,44 @@ const inboxSince = previous?.date.toISOString() ?? "";
     background: var(--swatch, linear-gradient(135deg, transparent 46%, var(--rule-strong) 46% 54%, transparent 54%));
     border-color: var(--blue);
     box-shadow: 0 0 0 2px var(--blue);
+  }
+
+  /* The text bar's color swatches show an "A" in their color; highlights are filled. */
+  .textbar [data-text-color]::after {
+    content: "A";
+    font-weight: 700;
+    color: var(--swatch, var(--ink));
+  }
+
+  .textbar .imagebar__frames [data-text-color] {
+    background: var(--stone);
+  }
+
+  .textbar .imagebar__frames [data-text-color][aria-pressed="true"] {
+    background: var(--stone);
+  }
+
+  .textbar__custom {
+    position: relative;
+    width: 1.35rem;
+    height: 1.35rem;
+    border-radius: 50%;
+    border: 1px solid var(--rule-strong);
+    background: conic-gradient(#e53935, #fdd835, #43a047, #1e88e5, #8e24aa, #e53935);
+    cursor: pointer;
+    overflow: hidden;
+  }
+
+  .textbar__custom.is-picked {
+    border-color: var(--blue);
+    box-shadow: 0 0 0 2px var(--blue);
+  }
+
+  .textbar__custom input {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    cursor: pointer;
   }
 
   .imagebar__width {

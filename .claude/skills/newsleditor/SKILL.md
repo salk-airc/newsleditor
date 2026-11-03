@@ -93,8 +93,9 @@ A paragraph or two. [Links](https://example.org) inline.
 ```
 
 - `### N. Title` makes a section; the number is dropped in the email but orders the sections.
-- `![alt](src "w=NNN")` sets an image's width in pixels; `frame=accent2` (or `accent`, `grey`, `none`) its frame. The alt text is shown as the caption. Images must be uploaded to the site (`media_upload`) and linked by the path it returns, never hotlinked from another site.
+- `![alt](src "w=NNN")` sets an image's width in pixels; `frame=accent2` (or `accent`, `grey`, `none`, or a color like `#c0392b`) its frame. The alt text is shown as the caption. Images must be uploaded to the site (`media_upload`) and linked by the path it returns, never hotlinked from another site.
 - `> text` makes a callout; `[text](url "button")` alone on a line makes a button.
+- `[words]{…}` styles words on one line: a color (`accent`, `accent2`, `muted`, `#rrggbb`), a highlight (`mark` yellow, `mark-accent`, `mark-accent2`), `big` or `small`, `underline`, any together (`[Deadline Friday]{accent mark}`). Use it sparingly, for what must stand out; the words can't contain a link.
 - `<!-- contents -->` anywhere adds an "In this edition" list.
 
 ### Filing things for later
