@@ -199,10 +199,28 @@ $npm = Join-Path $NodeDir "npm.cmd"
 
 Say "Getting newsleditor"
 $task = Get-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue
-if ($task) { Stop-ScheduledTask -TaskName $TaskName }
-# scripts\start.mjs runs the server as a second node process, which can outlive the task: stop ours.
-Get-Process node -ErrorAction SilentlyContinue | Where-Object { $_.Path -eq $node } | Stop-Process -Force
-Start-Sleep -Seconds 2
+# The new version is built beside the one installed, which keeps running
+# meanwhile, and only switched to once it has built: an update that fails
+# leaves the newsletter as it was, still up. A build records its own folder's
+# path, so it can't be moved afterwards: there are two folders, app-a and
+# app-b, and the startup task runs the one in use. (Installs from before this
+# run "app"; the first update replaces it.)
+$current = $null
+if ($task) {
+  foreach ($slot in "app-a", "app-b", "app") {
+    if ($task.Actions[0].Arguments -like "*\$slot\scripts\*") { $current = Join-Path $Root $slot; break }
+  }
+}
+$AppDir = if ($current -eq (Join-Path $Root "app-a")) { Join-Path $Root "app-b" } else { Join-Path $Root "app-a" }
+Remove-Item -Recurse -Force $AppDir -ErrorAction SilentlyContinue
+# A failed build: the new copy goes, and the installed one (if any) keeps running.
+function BuildFailed($text) {
+  # Out of the new copy first: Windows won't delete the current folder.
+  Set-Location $Root
+  Remove-Item -Recurse -Force $AppDir -ErrorAction SilentlyContinue
+  if ($current) { Fail "$text The version already installed is still running, unchanged." }
+  Fail $text
+}
 $zip = Join-Path $env:TEMP "newsleditor.zip"
 if (Test-Path $Source) { Copy-Item $Source $zip } else { Invoke-WebRequest $Source -OutFile $zip -UseBasicParsing }
 $tmp = Join-Path $env:TEMP "newsleditor-app"
@@ -211,7 +229,6 @@ Expand-Archive $zip -DestinationPath $tmp
 # GitHub's zips hold one folder (newsleditor-main); use whatever it's called.
 $inner = Get-ChildItem $tmp -Directory | Select-Object -First 1
 if (-not (Test-Path (Join-Path $inner.FullName "package.json"))) { Fail "That download isn't newsleditor." }
-Remove-Item -Recurse -Force $AppDir -ErrorAction SilentlyContinue
 Move-Item $inner.FullName $AppDir
 Remove-Item -Recurse -Force $tmp, $zip
 
@@ -233,9 +250,15 @@ Say "Installing and building newsleditor (a few minutes)"
 Push-Location $AppDir
 try {
   $env:npm_config_update_notifier = "false"
-  if ((Invoke-Program $npm ci --no-audit --no-fund --loglevel=error) -ne 0) { Fail "Installing newsleditor's packages failed (see $DataRoot\install.log)." }
-  if ((Invoke-Program $node (Join-Path $AppDir "node_modules\astro\bin\astro.mjs") build) -ne 0) { Fail "Building newsleditor failed (see $DataRoot\install.log)." }
+  if ((Invoke-Program $npm ci --no-audit --no-fund --loglevel=error) -ne 0) { BuildFailed "Installing newsleditor's packages failed (see $DataRoot\install.log)." }
+  if ((Invoke-Program $node (Join-Path $AppDir "node_modules\astro\bin\astro.mjs") build) -ne 0) { BuildFailed "Building newsleditor failed (see $DataRoot\install.log)." }
 } finally { Pop-Location }
+
+# Built: stop the installed version; the startup task below runs the new one.
+if ($task) { Stop-ScheduledTask -TaskName $TaskName }
+# scripts\start.mjs runs the server as a second node process, which can outlive the task: stop ours.
+Get-Process node -ErrorAction SilentlyContinue | Where-Object { $_.Path -eq $node } | Stop-Process -Force
+Start-Sleep -Seconds 2
 
 # ------------------------------------------------------------- the tunnel --
 
@@ -270,6 +293,8 @@ foreach ($i in 1..90) {
   try { Invoke-WebRequest "http://localhost:$Port/favicon.svg" -UseBasicParsing -TimeoutSec 2 | Out-Null; $up = $true; break } catch { Start-Sleep -Seconds 2 }
 }
 if (-not $up) { Fail "newsleditor didn't start. Its log: $DataRoot\install.log; restart it with: Start-ScheduledTask $TaskName" }
+# Running: the version it replaced goes.
+if ($current -and $current -ne $AppDir) { Remove-Item -Recurse -Force $current -ErrorAction SilentlyContinue }
 
 $open = if ($url) { $url } else { "http://localhost:$Port" }
 Say "Done: newsleditor is running at $open"

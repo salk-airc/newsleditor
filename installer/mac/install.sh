@@ -107,15 +107,28 @@ NODE="$NODE_DIR/bin/node"
 
 say "Getting newsleditor"
 uid="$(id -u)"
-launchctl bootout "gui/$uid/$LABEL.app" 2>/dev/null || true
+# The new version is built beside the one installed, which keeps running
+# meanwhile, and only switched to once it has built: an update that fails
+# leaves the newsletter as it was, still up. A build records its own folder's
+# path, so it can't be moved afterwards: there are two folders, app-a and
+# app-b, and app is a link to the one in use. (Installs from before this have
+# app as a folder of its own; the first update replaces it.)
+current="$(readlink "$APP_DIR" 2>/dev/null || true)"
+if [[ "$current" == "$HOME_DIR/app-a" ]]; then NEW_DIR="$HOME_DIR/app-b"; else NEW_DIR="$HOME_DIR/app-a"; fi
+rm -rf "$NEW_DIR"
 tmp="$(mktemp -d)"
 if [[ -f "$SOURCE" ]]; then cp "$SOURCE" "$tmp/app.tar.gz"; else curl -fsSL "$SOURCE" -o "$tmp/app.tar.gz"; fi
 tar -xzf "$tmp/app.tar.gz" -C "$tmp"
 inner="$(find "$tmp" -mindepth 1 -maxdepth 1 -type d -print -quit)"
 [[ -f "$inner/package.json" ]] || fail "That download isn't newsleditor."
-rm -rf "$APP_DIR"
-mv "$inner" "$APP_DIR"
+mv "$inner" "$NEW_DIR"
 rm -rf "$tmp"
+# A failed build: the new copy goes, and the installed one (if any) keeps running.
+build_failed() {
+  rm -rf "$NEW_DIR"
+  if [[ -e "$APP_DIR" ]]; then fail "$1 The version already installed is still running, unchanged."; fi
+  fail "$1"
+}
 
 # Its settings: from the code when there is one, else the ones already here.
 # Decoded with node (base64url JSON); written so only you can read them.
@@ -133,14 +146,23 @@ if [[ -n "$code" ]]; then
   ' "$CONFIG" "$HOME_DIR/tunnel-token" || exit 1
   umask 022
 fi
-cp "$CONFIG" "$APP_DIR/.env"
-chmod 600 "$APP_DIR/.env"
+cp "$CONFIG" "$NEW_DIR/.env"
+chmod 600 "$NEW_DIR/.env"
 url="$(sed -n 's/^SITE_URL=//p' "$CONFIG")"
 
 say "Installing and building newsleditor (a few minutes)"
-(cd "$APP_DIR" && npm_config_update_notifier=false "$NODE_DIR/bin/npm" ci --no-audit --no-fund --loglevel=error) ||
-  fail "Installing newsleditor's packages failed."
-(cd "$APP_DIR" && "$NODE" node_modules/astro/bin/astro.mjs build) || fail "Building newsleditor failed."
+(cd "$NEW_DIR" && npm_config_update_notifier=false "$NODE_DIR/bin/npm" ci --no-audit --no-fund --loglevel=error) ||
+  build_failed "Installing newsleditor's packages failed."
+(cd "$NEW_DIR" && "$NODE" node_modules/astro/bin/astro.mjs build) || build_failed "Building newsleditor failed."
+
+# Built: stop the installed version, point app at the new one, and start it
+# below; then the old one goes.
+launchctl bootout "gui/$uid/$LABEL.app" 2>/dev/null || true
+for _ in $(seq 1 15); do launchctl print "gui/$uid/$LABEL.app" >/dev/null 2>&1 || break; sleep 1; done
+old=""
+if [[ -L "$APP_DIR" ]]; then old="$current"; elif [[ -d "$APP_DIR" ]]; then rm -rf "$APP_DIR"; fi
+ln -sfn "$NEW_DIR" "$APP_DIR"
+[[ -n "$old" && "$old" != "$NEW_DIR" ]] && rm -rf "$old"
 
 # --------------------------------------------------------------- the tunnel --
 

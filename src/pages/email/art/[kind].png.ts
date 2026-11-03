@@ -1,7 +1,8 @@
 import type { APIRoute } from "astro";
 import { drawGlow, drawRule } from "../../../lib/email-art.ts";
+import { BANNER_HEIGHT } from "../../../plugins/newsletter/theme.ts";
 
-// /email/art/glow.png?a=3557a0&b=2f8f83&s=60 and
+// /email/art/glow.png?a=3557a0&b=2f8f83&s=60&p=0&h=100 and
 // /email/art/rule.png?a=3557a0&b=2f8f83: a newsletter's banner and rules,
 // drawn from its theme's colors (bannerUrl and ruleUrl in
 // src/plugins/newsletter/theme.ts). Public, like everything under /email,
@@ -33,10 +34,17 @@ export const GET: APIRoute = async ({ params, url }) => {
   let key: string;
   if (params.kind === "glow") {
     const strength = Number(q.get("s") ?? 60);
-    if (!a || !b || !Number.isInteger(strength) || strength < 0 || strength > 100)
-      return new Response("glow.png needs a, b (6-digit hex) and s (0 to 100)", { status: 400 });
-    draw = () => drawGlow({ a, b, strength });
-    key = `glow.png?a=${a}&b=${b}&s=${strength}`;
+    // Links from before patterns and heights draw the classic glow, 100px tall.
+    const pattern = Number(q.get("p") ?? 0);
+    const height = Number(q.get("h") ?? 100);
+    const whole = (n: number, min: number, max: number) => Number.isInteger(n) && n >= min && n <= max;
+    if (!a || !b || !whole(strength, 0, 100) || !whole(pattern, 0, 9999) || !whole(height, BANNER_HEIGHT.min, BANNER_HEIGHT.max))
+      return new Response(
+        `glow.png needs a, b (6-digit hex), s (0 to 100), and optionally p (0 to 9999) and h (${BANNER_HEIGHT.min} to ${BANNER_HEIGHT.max})`,
+        { status: 400 },
+      );
+    draw = () => drawGlow({ a, b, strength, pattern, height });
+    key = `glow.png?a=${a}&b=${b}&s=${strength}&p=${pattern}&h=${height}`;
   } else if (params.kind === "rule") {
     if (!a || !b) return new Response("rule.png needs a and b (6-digit hex)", { status: 400 });
     draw = () => drawRule({ a, b });

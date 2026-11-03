@@ -1,7 +1,7 @@
 ---
 import Newsletter from "../../layouts/Newsletter.astro";
 import { canEdit } from "../../lib/newsletter";
-import { FONTS, PALETTES } from "../../plugins/newsletter/theme.ts";
+import { BANNER_HEIGHT, FONTS, PALETTES } from "../../plugins/newsletter/theme.ts";
 
 // The newsletter's theme: name, logo, colors, font and glow banner, with the
 // email previewed live as they change (src/scripts/theme-editor.ts). Saved
@@ -118,7 +118,7 @@ const colors = [
             </fieldset>
 
             <fieldset>
-              <legend>Type and art</legend>
+              <legend>Type and lines</legend>
               <label>
                 Font
                 <select name="font" class="theme__font-select" data-font>
@@ -137,13 +137,52 @@ const colors = [
                 <span class="theme__hint" data-font-elsewhere />
               </label>
               <label class="theme__check">
-                <input type="checkbox" data-banner-on /> Glow banner across the top
-              </label>
-              <label>
-                Glow strength <input type="range" min="0" max="100" step="5" data-banner-strength />
-              </label>
-              <label class="theme__check">
                 <input type="checkbox" data-rules-on /> Lines under the name and headings
+              </label>
+            </fieldset>
+
+            <fieldset>
+              <legend>Banner</legend>
+              <label>
+                Across the top
+                <select data-banner-style>
+                  <option value="glow">A glow in the accent colors</option>
+                  <option value="image">Your own picture</option>
+                  <option value="none">No banner</option>
+                </select>
+              </label>
+              <div class="theme__banner-part" data-banner-part="glow">
+                <label>
+                  Glow strength <input type="range" min="0" max="100" step="5" data-banner-strength />
+                </label>
+                <div class="theme__pattern">
+                  <span>Pattern <span class="theme__hint" data-banner-pattern-name /></span>
+                  <button type="button" class="theme__button" data-banner-shuffle>Shuffle</button>
+                  <button type="button" class="theme__button" data-banner-classic>Classic</button>
+                </div>
+                <label>
+                  Height <input
+                    type="range"
+                    min={BANNER_HEIGHT.min}
+                    max={BANNER_HEIGHT.max}
+                    step="5"
+                    data-banner-height
+                  />
+                  <span class="theme__hint">You can also drag the bottom of the banner in a draft's preview.</span>
+                </label>
+              </div>
+              <div class="theme__banner-part" data-banner-part="image">
+                <div class="theme__logo">
+                  <img data-banner-img alt="" hidden />
+                  <span data-banner-none>No picture yet</span>
+                  <label class="theme__button">
+                    Upload… <input type="file" accept="image/png,image/jpeg,image/gif" data-banner-file hidden />
+                  </label>
+                </div>
+                <p class="theme__hint">A wide PNG or JPEG, about 1280 pixels across. It's shown the full width, at its own shape.</p>
+              </div>
+              <label class="theme__check" data-banner-part="glow image">
+                <input type="checkbox" data-banner-full /> Across the whole email, edge to edge
               </label>
             </fieldset>
 
@@ -269,6 +308,26 @@ const colors = [
     border-radius: 8px;
     background: none;
     cursor: pointer;
+  }
+
+  .theme__banner-part {
+    display: grid;
+    gap: 0.75rem;
+  }
+
+  [data-banner-part][hidden] {
+    display: none;
+  }
+
+  .theme__pattern {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.9rem;
+  }
+
+  .theme__pattern > span {
+    margin-right: auto;
   }
 
   .theme__palettes {

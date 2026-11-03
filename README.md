@@ -101,13 +101,14 @@ Markdown the email understands:
 | `- **Bold start.** One or two sentences.` | A bullet |
 | `![Caption](image.png "w=320")` | An image 320px wide, framed, with the caption under it. Paste an image to upload it |
 | Two image lines in a row | Images side by side |
-| `![Caption](image.png "w=240 frame=accent2")` | A frame in the second accent color (`accent`, `accent2`, `grey`, `none`) |
+| `![Caption](image.png "w=240 frame=accent2")` | A frame in the second accent color (`accent`, `accent2`, `grey`, `none`, or any color as `#c0392b`) |
+| `[these words]{accent mark big}` | Styled words: a color (`accent`, `accent2`, `muted`, `#c0392b`), a highlight (`mark`, `mark-accent`, `mark-accent2`), a size (`big`, `small`), `underline`. Select words to get the text bar |
 | `> Something to notice` | A tinted callout |
 | `[Sign up](https://… "button")` | A button (the first in a row is filled) |
 | `<!-- contents -->` | An "In this edition" list of the sections under the name |
 | `[ZOOM LINK]` | A placeholder, highlighted until you replace it |
 
-Put the cursor on an image's line to size, caption, frame, crop or rotate it.
+Put the cursor on an image's line to size, caption, frame, crop or rotate it; select words to make them bold, italic, underlined, colored, highlighted, bigger or smaller. A glow banner's bottom edge can be dragged in the preview to make it taller or shorter.
 
 **Sending**: click **Copy for Outlook**, paste into a new message, add recipients and send. Then publish the edition in the admin to put it in the archive. For Slack, write the short version in the **Slack post** tab and use **Copy for Slack**. Read [Images in sent emails](#images-in-sent-emails) before the first send.
 

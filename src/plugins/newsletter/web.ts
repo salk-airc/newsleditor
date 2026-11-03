@@ -1,5 +1,6 @@
 import { Marked, type Tokens } from "marked";
 import { groupImageRows, imageHints } from "./email.ts";
+import { styledText } from "./styling.ts";
 
 // Markdown edition body -> HTML for the newsletter archive on the site.
 //
@@ -31,6 +32,8 @@ export function renderWeb(markdown: string, options: RenderWebOptions = {}): { h
   // Images link to their full-size original, except inside a link already.
   let inLink = false;
 
+  // Styled words keep just their words here.
+  md.use(styledText());
   md.use({
     renderer: {
       heading({ tokens, text }) {
