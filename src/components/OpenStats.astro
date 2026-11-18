@@ -1,0 +1,336 @@
+---
+import type { Summary } from "../plugins/newsletter/opens.ts";
+
+// One edition's opens (src/plugins/newsletter/opens.ts) as a small dashboard:
+// totals, opens over time, and where they came from, the left-out ones
+// included, so nothing is hidden. Counts only, never names. The chart is
+// server-drawn SVG in the site's tokens, so it follows light and dark mode;
+// each column has a native tooltip, and the numbers are in the table under it.
+
+interface Props {
+  stats: Summary;
+  timeZone: string;
+}
+
+const { stats, timeZone } = Astro.props;
+
+const time = (iso: string, withDay = false) =>
+  new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    ...(withDay ? { weekday: "short", month: "short", day: "numeric" } : {}),
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(new Date(iso));
+const fmt = (n: number) => n.toLocaleString("en-US");
+
+const anything = stats.opens + stats.left + stats.beforeSend > 0;
+
+// Opens over time: one series, columns from a shared baseline.
+const W = 640;
+const H = 200;
+const PAD = { top: 12, right: 8, bottom: 26, left: 36 };
+const buckets = stats.timeline.buckets;
+const peak = Math.max(1, ...buckets.map((b) => b.opens));
+const step = [1, 2, 5, 10, 20, 25, 50, 100, 200, 250, 500, 1000].find((s) => peak / s <= 4) ?? 1000;
+const yMax = Math.ceil(peak / step) * step;
+const ticks = Array.from({ length: yMax / step + 1 }, (_, i) => i * step);
+const plotW = W - PAD.left - PAD.right;
+const plotH = H - PAD.top - PAD.bottom;
+const slot = buckets.length ? plotW / buckets.length : plotW;
+const barW = Math.max(2, Math.min(24, slot - 2));
+const y = (v: number) => PAD.top + plotH - (v / yMax) * plotH;
+const columns = buckets.map((b, i) => {
+  const h = (b.opens / yMax) * plotH;
+  const x = PAD.left + i * slot + (slot - barW) / 2;
+  const r = Math.min(4, barW / 2, h);
+  // Rounded data end, square at the baseline.
+  const top = PAD.top + plotH - h;
+  const d =
+    h <= 0
+      ? ""
+      : `M${x},${PAD.top + plotH} V${top + r} Q${x},${top} ${x + r},${top} H${x + barW - r} Q${x + barW},${top} ${x + barW},${top + r} V${PAD.top + plotH} Z`;
+  return { ...b, x, d, hitX: PAD.left + i * slot };
+});
+// Three time labels: first, middle, last column.
+const labelAt = buckets.length > 2 ? [0, Math.floor(buckets.length / 2), buckets.length - 1] : buckets.map((_, i) => i);
+const spanDays = buckets.length > 1 && Date.parse(buckets.at(-1)!.start) - Date.parse(buckets[0]!.start) > 20 * 3600_000;
+const minutes = stats.timeline.bucketMinutes;
+const unit = minutes >= 1440 ? "day" : minutes >= 60 ? `${minutes / 60} h` : `${minutes} min`;
+const sourceMax = Math.max(1, ...stats.sources.map((s) => s.opens));
+---
+
+{!anything && <p class="dash__empty">No opens yet. Counting starts with emails copied for Outlook from the editor.</p>}
+{
+  anything && (
+    <div class="dash">
+      <section class="tiles" aria-label="Totals">
+        <div class="tile">
+          <p class="tile__label">Opens</p>
+          <p class="tile__value">{fmt(stats.opens)}</p>
+          <p class="tile__sub">about {fmt(stats.openers)} people</p>
+        </div>
+        <div class="tile">
+          <p class="tile__label">{stats.sent ? "Went out" : "First open"}</p>
+          <p class="tile__value tile__value--time">
+            {stats.sent ? time(stats.sent) : stats.firstOpen ? time(stats.firstOpen) : "–"}
+          </p>
+          <p class="tile__sub">
+            {stats.sent
+              ? `${time(stats.sent, true).split(",").slice(0, 2).join(",")}, from the opens`
+              : stats.firstOpen
+                ? time(stats.firstOpen, true).split(",").slice(0, 2).join(",")
+                : "no opens yet"}
+          </p>
+        </div>
+        <div class="tile tile--muted">
+          <p class="tile__label">Left out</p>
+          <p class="tile__value">{fmt(stats.left + stats.beforeSend)}</p>
+          <p class="tile__sub">
+            {fmt(stats.left)} by prefetching and scanners
+            {stats.beforeSend > 0 && `, ${fmt(stats.beforeSend)} test opens before it went out`}
+          </p>
+        </div>
+      </section>
+
+      <p class="dash__def">
+        <strong>What's an open?</strong> Each time the email is shown with images on, including Outlook's reading pane
+        and repeat views. It doesn't mean it was read. People whose mail app blocks images aren't counted, and neither
+        are opens while this computer is off.
+      </p>
+
+      {buckets.length > 0 && (
+        <section class="panel" aria-labelledby="opens-time">
+          <h2 class="panel__title" id="opens-time">
+            Opens over time <span class="panel__unit">per {unit}</span>
+          </h2>
+          <svg class="chart" viewBox={`0 0 ${W} ${H}`} role="img" aria-label={`Opens per ${unit}`}>
+            {ticks.map((t) => (
+              <g>
+                <line class="chart__grid" x1={PAD.left} x2={W - PAD.right} y1={y(t)} y2={y(t)} />
+                <text class="chart__tick" x={PAD.left - 6} y={y(t) + 4} text-anchor="end">
+                  {t}
+                </text>
+              </g>
+            ))}
+            {columns.map((c) => (
+              <g class="chart__col">
+                <rect class="chart__hit" x={c.hitX} y={PAD.top} width={slot} height={plotH} />
+                {c.d && <path class="chart__bar" d={c.d} />}
+                <title>{`${time(c.start, spanDays)}: ${c.opens} ${c.opens === 1 ? "open" : "opens"}`}</title>
+              </g>
+            ))}
+            {labelAt.map((i) => (
+              <text
+                class="chart__tick"
+                x={columns[i]!.x + barW / 2}
+                y={H - 6}
+                text-anchor={i === 0 && labelAt.length > 1 ? "start" : i === buckets.length - 1 && labelAt.length > 1 ? "end" : "middle"}
+              >
+                {time(buckets[i]!.start, spanDays)}
+              </text>
+            ))}
+          </svg>
+        </section>
+      )}
+
+      <section class="panel" aria-labelledby="opens-from">
+        <h2 class="panel__title" id="opens-from">Where they came from</h2>
+        <table class="sources">
+          <thead>
+            <tr>
+              <th scope="col">From</th>
+              <th scope="col" class="num">Opens</th>
+              <th scope="col" class="num">People</th>
+            </tr>
+          </thead>
+          <tbody>
+            {stats.sources.map((s) => (
+              <tr class={s.counted ? "" : "sources__left"}>
+                <td>
+                  <span class="sources__name">{s.label}</span>
+                  <span class="sources__about">
+                    {s.about}
+                    {!s.counted && ": left out"}
+                  </span>
+                  <span class="sources__bar" style={`--w:${(s.opens / sourceMax) * 100}%`} aria-hidden="true" />
+                </td>
+                <td class="num">{fmt(s.opens)}</td>
+                <td class="num">{fmt(s.openers)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        <p class="dash__note">
+          “People” is about how many devices: the same mail app on the same network counts once, so people sharing an
+          office network can merge, and one person on a phone and a laptop counts twice.
+        </p>
+      </section>
+    </div>
+  )
+}
+
+<style>
+  .dash {
+    display: grid;
+    gap: 1.5rem;
+  }
+
+  .dash__empty,
+  .dash__def,
+  .dash__note {
+    color: var(--ink-soft);
+  }
+
+  .dash__def,
+  .dash__note {
+    font-size: 0.85rem;
+    margin: 0;
+  }
+
+  .dash__note {
+    margin-top: 0.75rem;
+  }
+
+  .tiles {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+    gap: 0.75rem;
+  }
+
+  .tile {
+    border: 1px solid var(--rule);
+    border-radius: 8px;
+    padding: 0.9rem 1rem;
+  }
+
+  .tile p {
+    margin: 0;
+  }
+
+  .tile__label {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--ink-soft);
+  }
+
+  .tile__value {
+    font-family: var(--font-display);
+    font-size: 2rem;
+    font-weight: 650;
+    line-height: 1.2;
+    margin-top: 0.25rem !important;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .tile__value--time {
+    font-size: 1.5rem;
+    padding-block: 0.15rem;
+  }
+
+  .tile__sub {
+    font-size: 0.8rem;
+    color: var(--ink-soft);
+  }
+
+  .tile--muted .tile__value {
+    color: var(--ink-soft);
+  }
+
+  .panel__title {
+    font-size: 1rem;
+    font-weight: 650;
+    margin: 0 0 0.75rem;
+  }
+
+  .panel__unit {
+    font-weight: 400;
+    font-size: 0.85rem;
+    color: var(--ink-soft);
+    margin-left: 0.35rem;
+  }
+
+  .chart {
+    width: 100%;
+    height: auto;
+    display: block;
+  }
+
+  .chart__grid {
+    stroke: var(--rule);
+    stroke-width: 1;
+  }
+
+  .chart__tick {
+    fill: var(--ink-soft);
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .chart__bar {
+    fill: var(--blue);
+  }
+
+  .chart__hit {
+    fill: transparent;
+  }
+
+  .chart__col:hover .chart__bar {
+    fill: var(--green);
+  }
+
+  .sources {
+    width: 100%;
+    border-collapse: collapse;
+    border-top: 1px solid var(--rule);
+  }
+
+  .sources th,
+  .sources td {
+    padding: 0.6rem 0.5rem 0.6rem 0;
+    border-bottom: 1px solid var(--rule);
+    text-align: left;
+    vertical-align: top;
+  }
+
+  .sources th {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--ink-soft);
+  }
+
+  .sources .num {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+    width: 5rem;
+  }
+
+  .sources__name {
+    display: block;
+    font-weight: 600;
+  }
+
+  .sources__about {
+    display: block;
+    font-size: 0.8rem;
+    color: var(--ink-soft);
+  }
+
+  .sources__bar {
+    display: block;
+    height: 4px;
+    margin-top: 0.4rem;
+    border-radius: 2px;
+    width: var(--w);
+    background: var(--blue);
+  }
+
+  .sources__left .sources__name,
+  .sources__left .num {
+    color: var(--ink-soft);
+  }
+
+  .sources__left .sources__bar {
+    background: var(--rule-strong);
+  }
+</style>

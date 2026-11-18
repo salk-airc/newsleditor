@@ -112,6 +112,8 @@ Put the cursor on an image's line to size, caption, frame, crop or rotate it; se
 
 **Sending**: click **Copy for Outlook**, paste into a new message, add recipients and send. Then publish the edition in the admin to put it in the archive. For Slack, write the short version in the **Slack post** tab and use **Copy for Slack**. Read [Images in sent emails](#images-in-sent-emails) before the first send.
 
+**Opens**: the copy for Outlook ends with an invisible 1x1 image from this site, `/email/o/<edition>.gif`, and the **Opens** page counts its loads: for every edition, then each one's opens over time and where they came from. It counts how many, never who: every reader gets the same image, and an open keeps only a keyed hash of the device's address and mail app, so roughly the same device counts once. Apple Mail's privacy prefetching and mail scanners that name themselves are left out, and so are test sends: once at least 8 devices load the image within one minute (a send to a list), opens before that minute don't count. It's rough by nature: mail apps that block images aren't counted, and neither are opens while the newsletter's computer is off. Links aren't tracked. Turn it off under **Settings > Counting opens**.
+
 ## Connect Claude
 
 Claude Code can work on the newsletter through this site's MCP server:

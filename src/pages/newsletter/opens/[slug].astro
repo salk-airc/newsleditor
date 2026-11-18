@@ -1,0 +1,80 @@
+---
+import OpenStats from "../../../components/OpenStats.astro";
+import Newsletter from "../../../layouts/Newsletter.astro";
+import { canEdit, formatDate, getEditions, getSettings } from "../../../lib/newsletter";
+import { openSummary } from "../../../lib/opens.ts";
+import type { Summary } from "../../../plugins/newsletter/opens.ts";
+
+// One edition's opens: totals, over time, and where they came from
+// (src/components/OpenStats.astro). Same gate as the editor.
+
+export const prerender = false;
+
+const user = Astro.locals.user;
+if (!user) {
+  return Astro.redirect(`/_emdash/admin/login?redirect=${encodeURIComponent(Astro.url.pathname)}`);
+}
+const allowed = canEdit(user);
+if (!allowed) Astro.response.status = 403;
+Astro.response.headers.set("Cache-Control", "private, no-store");
+
+const slug = Astro.params.slug ?? "";
+const { settings } = await getSettings();
+const [published, drafts] = allowed ? await Promise.all([getEditions(), getEditions("draft")]) : [[], []];
+const edition = [...published, ...drafts].find((e) => e.slug === slug);
+const inArchive = published.some((e) => e.slug === slug);
+if (allowed && !edition) Astro.response.status = 404;
+
+let stats: Summary | null = null;
+if (allowed && edition) {
+  try {
+    stats = await openSummary(slug);
+  } catch (err) {
+    console.error("[opens] read", slug, err);
+  }
+}
+---
+
+<Newsletter title={`Opens, ${edition ? formatDate(edition.date) : slug} — ${settings.name}`}>
+  <section class="edition-opens shell">
+    <a class="label" href="/newsletter/opens">← All editions</a>
+    {
+      !allowed ? (
+        <p class="prose">The counts are for Editors and Admins.</p>
+      ) : !edition ? (
+        <p class="prose">There's no edition {slug}.</p>
+      ) : (
+        <>
+          <h1 class="display edition-opens__title">{formatDate(edition.date)}</h1>
+          <p class="edition-opens__sub">
+            {edition.title}
+            {" · "}
+            {inArchive ? <a href={`/newsletter/${slug}`}>read it</a> : <a href={`/newsletter/edit/${slug}`}>open the draft</a>}
+          </p>
+          {stats ? (
+            <OpenStats stats={stats} timeZone={settings.timeZone} />
+          ) : (
+            <p class="prose">Couldn't load the counts. Try again in a minute.</p>
+          )}
+        </>
+      )
+    }
+  </section>
+</Newsletter>
+
+<style>
+  .edition-opens {
+    max-width: 48rem;
+    padding-block: clamp(2rem, 6vh, 3.5rem) 4rem;
+  }
+
+  .edition-opens__title {
+    font-size: clamp(2rem, 5vw, 2.8rem);
+    margin: 1rem 0 0.25rem;
+  }
+
+  .edition-opens__sub {
+    color: var(--ink-soft);
+    margin-bottom: 1.5rem;
+  }
+</style>

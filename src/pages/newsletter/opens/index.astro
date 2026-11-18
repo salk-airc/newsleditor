@@ -1,0 +1,179 @@
+---
+import Newsletter from "../../../layouts/Newsletter.astro";
+import { canEdit, formatDate, getEditions, getSettings } from "../../../lib/newsletter";
+import { allOpenSummaries } from "../../../lib/opens.ts";
+import type { Summary } from "../../../plugins/newsletter/opens.ts";
+
+// Every edition's opens on one page, newest first
+// (src/plugins/newsletter/opens.ts says how they're counted). Each row links
+// to the edition's own page, /newsletter/opens/<slug>. Same gate as the
+// editor: Editors and Admins.
+
+export const prerender = false;
+
+const user = Astro.locals.user;
+if (!user) {
+  return Astro.redirect(`/_emdash/admin/login?redirect=${encodeURIComponent(Astro.url.pathname)}`);
+}
+const allowed = canEdit(user);
+if (!allowed) Astro.response.status = 403;
+Astro.response.headers.set("Cache-Control", "private, no-store");
+
+interface Row {
+  slug: string;
+  date: Date;
+  title: string;
+  draft: boolean;
+  totals: Summary | null;
+}
+
+const { settings } = await getSettings();
+let rows: Row[] = [];
+let failed = false;
+if (allowed) {
+  try {
+    const [published, drafts, totals] = await Promise.all([getEditions(), getEditions("draft"), allOpenSummaries()]);
+    // Published editions always; a draft only once it has opens (copied and
+    // sent, not published to the archive yet).
+    rows = [
+      ...published.map((e) => ({ slug: e.slug, date: e.date, title: e.title, draft: false, totals: totals.get(e.slug) ?? null })),
+      ...drafts
+        .filter((e) => totals.has(e.slug))
+        .map((e) => ({ slug: e.slug, date: e.date, title: e.title, draft: true, totals: totals.get(e.slug)! })),
+    ].sort((a, b) => b.date.getTime() - a.date.getTime());
+  } catch (err) {
+    console.error("[opens] overview", err);
+    failed = true;
+  }
+}
+---
+
+<Newsletter title={`Opens — ${settings.name}`}>
+  <section class="overview shell">
+    <h1 class="display overview__title">Opens</h1>
+    {
+      !allowed ? (
+        <p class="prose">
+          You're signed in as {user.email}, which can't see the counts. They're for Editors and Admins; ask an Admin to
+          change your role in <a href="/_emdash/admin">the admin</a>.
+        </p>
+      ) : failed ? (
+        <p class="prose">Couldn't load the counts. Try again in a minute.</p>
+      ) : (
+        <>
+          <p class="overview__intro">
+            How many people opened each edition, newest first. Click one for when and from where.
+            {!settings.countOpens && (
+              <>
+                {" "}
+                <strong>Counting is off</strong>, so new copies for Outlook don't carry the open image: turn it on in{" "}
+                <a href="/newsletter/setup">Settings</a>.
+              </>
+            )}
+          </p>
+          {rows.length === 0 ? (
+            <p class="overview__none">
+              Nothing to count yet. Opens are counted for emails copied for Outlook from the editor once they're sent.
+            </p>
+          ) : (
+            <table class="overview__table">
+              <thead>
+                <tr>
+                  <th scope="col">Edition</th>
+                  <th scope="col" class="num">
+                    Opens
+                  </th>
+                  <th scope="col" class="num">
+                    People
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((r) => (
+                  <tr>
+                    <td>
+                      <a href={`/newsletter/opens/${r.slug}`}>
+                        <time datetime={r.slug}>{formatDate(r.date)}</time>
+                      </a>
+                      {r.draft && <span class="overview__tag">not in the archive yet</span>}
+                    </td>
+                    <td class="num">{r.totals ? r.totals.opens.toLocaleString("en-US") : "–"}</td>
+                    <td class="num">{r.totals ? `≈${r.totals.openers.toLocaleString("en-US")}` : "–"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+          <p class="overview__note">
+            Rough by nature: mail apps that block images don't count, opens while this computer is off aren't counted,
+            and Apple Mail's prefetching and mail scanners we can spot are left out. Each edition's page says how many.
+          </p>
+        </>
+      )
+    }
+  </section>
+</Newsletter>
+
+<style>
+  .overview {
+    max-width: 48rem;
+    padding-block: clamp(2rem, 6vh, 3.5rem) 4rem;
+  }
+
+  .overview__title {
+    font-size: clamp(2rem, 5vw, 2.8rem);
+    margin-bottom: 1rem;
+  }
+
+  .overview__intro,
+  .overview__none {
+    color: var(--ink-soft);
+    margin-bottom: 1.5rem;
+  }
+
+  .overview__table {
+    width: 100%;
+    border-collapse: collapse;
+    border-top: 1px solid var(--rule);
+  }
+
+  .overview__table th,
+  .overview__table td {
+    padding: 0.75rem 0.5rem 0.75rem 0;
+    border-bottom: 1px solid var(--rule);
+    text-align: left;
+    vertical-align: baseline;
+  }
+
+  .overview__table th {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--ink-soft);
+  }
+
+  .overview__table .num {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+
+  .overview__table a {
+    color: var(--ink);
+  }
+
+  .overview__table a:hover {
+    color: var(--green-ink);
+  }
+
+  .overview__tag {
+    margin-left: 0.5rem;
+    font-size: 0.75rem;
+    color: var(--ink-soft);
+  }
+
+  .overview__note {
+    margin-top: 1rem;
+    color: var(--ink-soft);
+    font-size: 0.8rem;
+  }
+</style>
