@@ -201,6 +201,20 @@ S3_PUBLIC_URL=https://media.example.org`}
             </div>
           </fieldset>
 
+          <fieldset>
+            <legend>
+              <span class="setup__step">5</span> Counting opens
+            </legend>
+            <label class="setup__choice">
+              <input type="checkbox" name="countOpens" />
+              <span>
+                <strong>Count how many people open each edition.</strong> The copy for Outlook ends with an invisible
+                image from this site, and <a href="/newsletter/opens">Opens</a> counts its loads: how many, never who.
+                Opens are only counted while this computer is on, and mail apps that block images aren't counted.
+              </span>
+            </label>
+          </fieldset>
+
           <p class="setup__actions">
             <button type="submit" class="setup__save" data-save>{configured ? "Save settings" : "Save and continue"}</button>
             <span class="setup__status" data-status role="status" />
@@ -208,7 +222,7 @@ S3_PUBLIC_URL=https://media.example.org`}
 
           <fieldset data-connect hidden={!configured}>
             <legend>
-              <span class="setup__step">5</span> Connect Claude
+              <span class="setup__step">6</span> Connect Claude
             </legend>
             <p class="setup__hint">
               Claude Code can then add things to the newsletter's inbox, start an edition in your voice, and change the

@@ -37,6 +37,12 @@ export const settingsSchema = z.object({
    * storage comes from the server's environment (see README).
    */
   images: z.enum(["local", "bucket"]),
+  /**
+   * Whether the copy for Outlook carries an open image, so the Opens page can
+   * count how many people opened each edition (opens.ts). Counts only, never
+   * who.
+   */
+  countOpens: z.boolean(),
 });
 export type Settings = z.infer<typeof settingsSchema>;
 
@@ -68,6 +74,7 @@ export const DEFAULT_SETTINGS: Settings = {
   sender: { name: "", email: "" },
   voice: "",
   images: "local",
+  countOpens: true,
 };
 
 export function applySettingsPatch(settings: Settings, patch: SettingsPatch): Settings {

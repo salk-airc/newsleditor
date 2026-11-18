@@ -22,6 +22,7 @@ import { joinedToBullet, placeholders, wordCount } from "../plugins/newsletter/c
 import { type Frame, type FrameName, imageHints } from "../plugins/newsletter/email.ts";
 import { frameColors, renderDesignedEmail } from "../plugins/newsletter/email-designed.ts";
 import { formatDate } from "../plugins/newsletter/editions.ts";
+import { openImageTag } from "../plugins/newsletter/opens.ts";
 import { DEFAULT_SETTINGS, type Settings } from "../plugins/newsletter/settings.ts";
 import { BANNER_HEIGHT, DEFAULT_THEME, type Theme } from "../plugins/newsletter/theme.ts";
 import { plugin, uploadImage as upload } from "./emdash-api.ts";
@@ -1308,6 +1309,9 @@ export async function startEditor(root: HTMLElement): Promise<void> {
     const comments: Node[] = [];
     while (walker.nextNode()) comments.push(walker.currentNode);
     comments.forEach((c) => c.parentNode?.removeChild(c));
+    // The open image (src/plugins/newsletter/opens.ts): only in the copy, so
+    // the preview never counts as an open.
+    if (view === "email" && settings.countOpens) page.body.insertAdjacentHTML("beforeend", openImageTag(location.origin, slug));
 
     const html = page.body.innerHTML.trim();
     // Slack sometimes pastes the plain text instead of the rich text. Its

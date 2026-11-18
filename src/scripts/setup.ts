@@ -59,6 +59,7 @@ export function startSetup(form: HTMLFormElement) {
     const images = form.querySelector<HTMLInputElement>(`input[name="images"][value="${s.images}"]`);
     if (images) images.checked = true;
     bucket.hidden = s.images !== "bucket";
+    (field("countOpens") as HTMLInputElement).checked = s.countOpens;
   }
 
   /** The subject from the box and the checkbox. A box with {date} in it already says where the date goes. */
@@ -76,6 +77,7 @@ export function startSetup(form: HTMLFormElement) {
       starter: field("starter").value,
       voice: field("voice").value,
       images: (form.querySelector<HTMLInputElement>('input[name="images"]:checked')?.value ?? "local") as Settings["images"],
+      countOpens: (field("countOpens") as HTMLInputElement).checked,
     };
   }
 
