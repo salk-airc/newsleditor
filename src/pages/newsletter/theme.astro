@@ -186,6 +186,26 @@ const colors = [
               </label>
             </fieldset>
 
+            <fieldset>
+              <legend>Your own header and footer</legend>
+              <p class="theme__hint">
+                HTML for every edition, instead of the banner and the name. {"{name}"}, {"{date}"} and {"{subject}"} are
+                filled in for each one. Write it for Outlook: tables and inline styles. Claude can write it for you: ask it to
+                design the newsletter's header.
+              </p>
+              <label>
+                Header
+                <textarea name="headerHtml" rows="8" class="theme__code" spellcheck="false" maxlength="20000" placeholder="Empty: the banner and the name, as set above" />
+              </label>
+              <p class="theme__pattern">
+                <button type="button" class="theme__button" data-header-example>Start from an example</button>
+              </p>
+              <label>
+                Footer
+                <textarea name="footerHtml" rows="5" class="theme__code" spellcheck="false" maxlength="20000" placeholder="Empty: just the footer line" />
+              </label>
+            </fieldset>
+
             <ul class="theme__problems" data-problems aria-live="polite" />
 
             <p class="theme__actions">
@@ -263,6 +283,14 @@ const colors = [
   legend {
     font-weight: 600;
     padding: 0;
+  }
+
+  .theme__code {
+    font-family: ui-monospace, Menlo, Consolas, monospace;
+    font-size: 0.8rem;
+    line-height: 1.45;
+    white-space: pre;
+    overflow-x: auto;
   }
 
   label {

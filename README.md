@@ -5,7 +5,7 @@ A studio for writing an email newsletter together, which you run yourself, on yo
 - **Write together, live.** Several people edit the same edition at once and see each other's cursors. Everyone writes markdown on one side and sees the real email, the Slack post and the archive page on the other.
 - **Paste straight into Outlook and Slack.** "Copy for Outlook" puts the designed email on the clipboard, ready to paste into a new message. "Copy for Slack" does the same for a short Slack version.
 - **Emails that survive real inboxes.** The design is built around what Outlook, Gmail and phone dark modes actually do to an email (see [Why the email looks the way it does](#why-the-email-looks-the-way-it-does)).
-- **Your look.** A theme (name, logo, colors, font) set up from your logo, checked so it stays readable.
+- **Your look.** A theme (name, logo, colors, font) set up from your logo, checked so it stays readable, or a header and footer of your own in HTML for every edition.
 - **Claude as a co-writer.** Connect Claude Code and it can collect links for the next edition, start a draft in your newsletter's voice, and change the theme.
 - **An archive** of every edition sent, for the people signed in.
 
@@ -106,6 +106,8 @@ Markdown the email understands:
 | `> Something to notice` | A tinted callout |
 | `[Sign up](https://… "button")` | A button (the first in a row is filled) |
 | `<!-- contents -->` | An "In this edition" list of the sections under the name |
+| `<!-- bare -->` | No banner, header, masthead or heading lines in this edition: for a special issue that draws its own look with HTML boxes. For a look on every edition, use the Theme page's own header and footer instead |
+| A ` ```html ` block | An HTML box: your own HTML, for a colored box, columns or an event card. It's cleaned first: no scripts, forms or embeds, links only to http(s) and mailto, images only from the site's uploads. Write it for Outlook: tables for layout and inline styles. The **HTML box** button in the text bar starts one, and Claude can write them |
 | `[ZOOM LINK]` | A placeholder, highlighted until you replace it |
 
 Put the cursor on an image's line to size, caption, frame, crop or rotate it; select words to make them bold, italic, underlined, colored, highlighted, bigger or smaller. A glow banner's bottom edge can be dragged in the preview to make it taller or shorter.

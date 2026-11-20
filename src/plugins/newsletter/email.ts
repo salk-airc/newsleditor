@@ -1,4 +1,5 @@
 import { Marked, type Token, type Tokens } from "marked";
+import { cleanHtml, HTML_BOX_LANG } from "./html-box.ts";
 import { styledText } from "./styling.ts";
 
 // Markdown edition body -> plain Outlook-safe email HTML, the renderer for a
@@ -11,6 +12,7 @@ import { styledText } from "./styling.ts";
 // - consecutive image-only paragraphs become one table row, each image at its
 //   "w=NNN" title hint (else 320px in a row, 400px alone);
 // - [PLACEHOLDERS] are highlighted so they can't be missed in a preview;
+// - a ```html block is the team's own HTML, cleaned (html-box.ts);
 // - the newsletter's signature (a setting) is appended here, never stored in the body.
 //
 // Pure function: no I/O. Callers decide where images come from (the studio's
@@ -60,6 +62,11 @@ export function renderEmail(markdown: string, options: RenderEmailOptions): stri
       },
       image({ href, text }) {
         return `<img alt="${escapeAttr(text)}" src="${escapeAttr(resolveImage(href))}">`;
+      },
+      // An HTML box (html-box.ts), cleaned; other code blocks as marked has them.
+      code({ text, lang }) {
+        if (lang?.trim().toLowerCase() !== HTML_BOX_LANG) return false;
+        return `<div style="margin:0 0 12pt">${cleanHtml(text, resolveImage, PLACEHOLDER).html}</div>\n`;
       },
     },
   });

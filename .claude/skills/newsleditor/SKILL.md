@@ -43,7 +43,8 @@ From the newsletter plugin (in Claude Code their names end in `newsletter__add_i
 | `settings_update` | Changing those, when the user asks |
 | `add_item` | Filing a link and/or note for the next edition |
 | `list_items` | What's waiting in the inbox |
-| `next_edition` | The next edition's date, slug, subject, starter body, studio link and voice. Creates nothing |
+| `next_edition` | The next edition's date, slug, subject, starter body, studio link, voice and the body's format. Creates nothing |
+| `edition_format` | How an edition's body is written, HTML boxes included: read it before changing a draft |
 | `mark_used` | Taking the items a draft used out of the inbox |
 | `theme_get` / `theme_update` | The email's look: name, logo, colors, font, banner |
 
@@ -95,8 +96,10 @@ A paragraph or two. [Links](https://example.org) inline.
 - `### N. Title` makes a section; the number is dropped in the email but orders the sections.
 - `![alt](src "w=NNN")` sets an image's width in pixels; `frame=accent2` (or `accent`, `grey`, `none`, or a color like `#c0392b`) its frame. The alt text is shown as the caption. Images must be uploaded to the site (`media_upload`) and linked by the path it returns, never hotlinked from another site.
 - `> text` makes a callout; `[text](url "button")` alone on a line makes a button.
+- A fenced ` ```html ` block is an HTML box, for what markdown can't do (a colored box, two columns, an event card). Write it for Outlook: tables for layout, inline styles only, plain colors, images only from `media_upload`, links only http(s) or mailto. Anything else (scripts, forms, `url()` in styles, positioning) is taken out. `edition_format` has the details and an example.
 - `[words]{…}` styles words on one line: a color (`accent`, `accent2`, `muted`, `#rrggbb`), a highlight (`mark` yellow, `mark-accent`, `mark-accent2`), `big` or `small`, `underline`, any together (`[Deadline Friday]{accent mark}`). Use it sparingly, for what must stand out; the words can't contain a link.
 - `<!-- contents -->` anywhere adds an "In this edition" list.
+- A look for every edition (top bar, nameplate, footer) goes in the theme: `theme_update` with `headerHtml` / `footerHtml` (`{name}`, `{date}`, `{subject}` filled in per edition). `<!-- bare -->` anywhere in one edition drops the frame (banner or header, masthead, heading lines) for a special issue that draws its own look in HTML boxes.
 
 ### Filing things for later
 
