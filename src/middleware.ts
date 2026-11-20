@@ -1,6 +1,7 @@
 import { defineMiddleware } from "astro:middleware";
 import { OptionsRepository } from "emdash/api/route-utils";
 import { LOGIN_PATH, oidcConfig } from "./auth/oidc.ts";
+import { approveToolsAfterUpdate } from "./lib/claude-tools.ts";
 import { canEdit, getSettings } from "./lib/newsletter";
 
 // Who can see what:
@@ -49,6 +50,9 @@ async function emdashSetUp(db: ConstructorParameters<typeof OptionsRepository>[0
 
 export const onRequest = defineMiddleware(async (context, next) => {
   const { pathname, search } = context.url;
+
+  // After an update: Claude keeps the newsletter's tools (src/lib/claude-tools.ts).
+  if (context.locals.emdash) await approveToolsAfterUpdate(context.locals.emdash);
 
   if (SEARCH.test(pathname)) return new Response("Not found", { status: 404 });
   if (pathname === "/") return context.redirect("/newsletter");

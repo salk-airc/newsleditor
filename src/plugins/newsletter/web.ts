@@ -1,4 +1,5 @@
 import { Marked, type Tokens } from "marked";
+import { cleanHtml, HTML_BOX_LANG } from "./html-box.ts";
 import { groupImageRows, imageHints } from "./email.ts";
 import { styledText } from "./styling.ts";
 
@@ -12,7 +13,8 @@ import { styledText } from "./styling.ts";
 //
 // The body comes from our own editors and Claude, but it's published on the
 // open web, so raw HTML in the markdown is dropped and links are limited to
-// http(s), mailto and relative URLs.
+// http(s), mailto and relative URLs. A ```html box is kept, but only after
+// html-box.ts has cleaned it.
 
 export interface RenderWebOptions {
   /** Maps an image src from the markdown to the URL the page loads. */
@@ -55,6 +57,11 @@ export function renderWeb(markdown: string, options: RenderWebOptions = {}): { h
       },
       html() {
         return "";
+      },
+      // An HTML box (html-box.ts), cleaned; other code blocks as marked has them.
+      code({ text, lang }) {
+        if (lang?.trim().toLowerCase() !== HTML_BOX_LANG) return false;
+        return `<div class="html-box">${cleanHtml(text, resolveImage).html}</div>\n`;
       },
       hr() {
         return "";

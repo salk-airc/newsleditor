@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { cleanHtml } from "./html-box.ts";
 
 // A newsletter's look: its name, logo, colors, font and banner, as data that
 // the group running it edits (in the studio's Theme page, or by asking
@@ -93,6 +94,14 @@ export const themeSchema = z.object({
   }),
   /** The accent lines (rules) under the name and the section headings. */
   rules: z.boolean(),
+  /**
+   * The newsletter's own header, in HTML (html-box.ts cleans it): when set,
+   * it replaces the banner and the masthead in every edition. {name}, {date}
+   * and {subject} are filled in for each edition.
+   */
+  headerHtml: z.string().max(20_000),
+  /** Its own footer, in HTML, under every edition (after the footer line). Same fill-ins. */
+  footerHtml: z.string().max(20_000),
 });
 export type Theme = z.infer<typeof themeSchema>;
 
@@ -129,6 +138,8 @@ export const DEFAULT_THEME: Theme = {
   font: "sans",
   banner: { style: "glow", strength: 60, pattern: 0, height: 100, fullWidth: false, image: null },
   rules: true,
+  headerHtml: "",
+  footerHtml: "",
 };
 
 /** Ready-made color sets for the Theme page, each readable by checkTheme. The first is the default. */
@@ -265,8 +276,14 @@ export function checkTheme(theme: Theme, media?: string | null): ThemeCheck {
     if (src && /\.svg(\?|$)/i.test(src))
       warnings.push(`The ${label} is an SVG, which Gmail and Outlook don't show: it will be missing in most inboxes. Upload a PNG or JPEG instead.`);
   }
-  if (theme.banner.style === "image" && !theme.banner.image)
+  if (theme.banner.style === "image" && !theme.banner.image && !theme.headerHtml.trim())
     errors.push("The banner is set to a picture, but none is uploaded. Upload one, or pick the glow or no banner.");
+  for (const [label, html] of [["header", theme.headerHtml], ["footer", theme.footerHtml]] as const) {
+    if (!html.trim()) continue;
+    const clean = cleanHtml(html);
+    if (clean.removed.length) warnings.push(`Left out of the ${label}: ${clean.removed.join(", ")}.`);
+    if (clean.outlook.length) warnings.push(`In the ${label}: ${clean.outlook.join(", ")}.`);
+  }
   return { errors, warnings };
 }
 

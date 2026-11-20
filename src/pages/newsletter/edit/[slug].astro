@@ -108,6 +108,11 @@ const inboxSince = previous?.date.toISOString() ?? "";
               <button type="button" data-text-list="bullet" title="Bullets" aria-label="Bullets">•≡</button>
               <button type="button" data-text-list="number" title="Numbering" aria-label="Numbering">1≡</button>
             </div>
+            <div class="imagebar__sizes" role="group" aria-label="Insert">
+              <button type="button" data-insert-html title="Your own HTML, for a colored box, columns or a card: starts with an example to change">
+                HTML box
+              </button>
+            </div>
             {/* A swatch puts its color on, and clicked again takes it off. */}
             <div class="imagebar__frames" role="group" aria-label="Color">
               <button type="button" data-text-color="accent" title="Accent" aria-label="Accent" />

@@ -1,4 +1,5 @@
 import { PLACEHOLDER } from "./email.ts";
+import { cleanHtml, htmlBoxes } from "./html-box.ts";
 
 // Pre-send checks on an edition's markdown, shown under the studio's editor.
 // Pure functions, so they run in the browser too.
@@ -6,6 +7,8 @@ import { PLACEHOLDER } from "./email.ts";
 /** Words a reader sees: link URLs and image syntax don't count. */
 export function wordCount(markdown: string): number {
   return markdown
+    .replace(/<[^>]*>/g, " ")
+    .replace(/^(`{3,}|~{3,}).*$/gm, "")
     .replace(/!\[[^\]]*\]\([^)]*\)/g, "")
     .replace(/\]\([^)]*\)/g, "]")
     .split(/\s+/)
@@ -25,6 +28,21 @@ export function joinedToBullet(markdown: string): string[] {
     }
   }
   return hits;
+}
+
+/** What the email won't show of the edition's HTML boxes: what cleaning takes out, and what Outlook ignores. */
+export function htmlBoxProblems(markdown: string): string[] {
+  const removed = new Set<string>();
+  const outlook = new Set<string>();
+  for (const box of htmlBoxes(markdown)) {
+    const clean = cleanHtml(box);
+    clean.removed.forEach((r) => removed.add(r));
+    clean.outlook.forEach((o) => outlook.add(o));
+  }
+  return [
+    ...(removed.size ? [`HTML box: left out of the email: ${[...removed].join(", ")}`] : []),
+    ...(outlook.size ? [`HTML box: ${[...outlook].join(", ")}`] : []),
+  ];
 }
 
 export function placeholders(markdown: string): string[] {

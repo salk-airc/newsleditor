@@ -10,6 +10,7 @@ import {
   settingsPatchSchema,
   settingsSchema,
 } from "./settings.ts";
+import { EDITION_FORMAT } from "./format.ts";
 import { publicMediaUrl } from "./media.ts";
 import { applyPatch, checkTheme, DEFAULT_THEME, type Theme, themePatchSchema, themeSchema } from "./theme.ts";
 
@@ -25,6 +26,8 @@ import { applyPatch, checkTheme, DEFAULT_THEME, type Theme, themePatchSchema, th
 //   edition, and its studio link. It doesn't create the edition: EmDash gives
 //   plugins no way to set a slug, and an edition's slug is its date, so Claude
 //   creates it with the core content_create tool.
+// - edition_format: how an edition's body is written (format.ts), HTML boxes
+//   included; next_edition returns it too.
 // - settings_get / settings_update: name, schedule, subject format, starter,
 //   signature, sender and voice, filled in by first-run setup.
 // - theme_get / theme_update: the look of the email.
@@ -151,6 +154,11 @@ const nextEditionOutput = z.object({
   studioUrl: z.string().describe("Where the team edits it: hand this link over"),
   editionDay: z.string().nullable().describe("The day editions go out, or null with no fixed day"),
   voice: z.string().describe("How the newsletter sounds, in the editors' words: write the draft in this voice"),
+  format: z.string().describe("How to write the body: sections, images, callouts, buttons, styled words and HTML boxes"),
+});
+
+const editionFormatOutput = z.object({
+  format: z.string().describe("How an edition's body is written"),
 });
 
 const listItemsInput = z.object({
@@ -400,8 +408,16 @@ export function createPlugin() {
             studioUrl: studio,
             editionDay: weekdayName(settings.weekday),
             voice: settings.voice,
+            format: EDITION_FORMAT,
           };
         },
+      },
+
+      // How an edition's body is written, for changing one (format.ts).
+      "edition-format": {
+        permission: "content:read_drafts",
+        input: noInput,
+        handler: async () => ({ format: EDITION_FORMAT }),
       },
 
       // The newsletter's settings, for the studio, setup and Claude.
@@ -558,10 +574,17 @@ export function createPlugin() {
         },
         next_edition: {
           description:
-            "Before starting an edition: the next edition day with no edition yet (or the date given), its slug, subject line, edition_date and starter body, whether it already exists, its studio link, and the newsletter's voice to write in. Doesn't create anything: create the draft with content_create in the editions collection, using this slug and these fields, unless exists is true.",
+            "Before starting an edition: the next edition day with no edition yet (or the date given), its slug, subject line, edition_date and starter body, whether it already exists, its studio link, the newsletter's voice to write in and how to write the body (format). Doesn't create anything: create the draft with content_create in the editions collection, using this slug and these fields, unless exists is true.",
           route: "next-edition",
           input: nextEditionInput,
           output: nextEditionOutput,
+        },
+        edition_format: {
+          description:
+            "How an edition's body is written: sections, images, callouts, buttons, styled words, and HTML boxes (your own Outlook-safe HTML in a ```html block, for a colored box, columns or a card). Read it before changing an edition's body with content_update, e.g. when asked to add a box or restyle part of a draft.",
+          route: "edition-format",
+          input: noInput,
+          output: editionFormatOutput,
         },
         settings_get: {
           description:
@@ -586,7 +609,7 @@ export function createPlugin() {
         },
         theme_update: {
           description:
-            "Change the newsletter's theme when the user asks for new branding. Pass only what changes. Email limits apply: the page must be light, text (ink) near-black so phone dark modes turn it white, and the accents deep enough to read as link text; the glow banner and rules are drawn as images from accent and accent2, so gradients aren't set directly; rules: false removes the lines under the name and headings. The banner: style glow, image (the newsletter's own picture in banner.image) or none; for the glow, strength 0-100, pattern (0 the classic two glows, any other number up to 9999 a different arrangement, to try a new look) and height (50-240px); fullWidth: true runs it edge to edge instead of across the reading column. A logo or banner picture must be on this site: media_upload it and use the path it returns (/_emdash/api/media/file/...), a transparent PNG for a logo, a wide PNG or JPEG for a banner; links to other sites are refused. If the result would be hard to read, nothing is saved and saved is false: tell the user the errors and suggest a fix. Tell them any warnings too.",
+            "Change the newsletter's theme when the user asks for new branding. Pass only what changes. Email limits apply: the page must be light, text (ink) near-black so phone dark modes turn it white, and the accents deep enough to read as link text; the glow banner and rules are drawn as images from accent and accent2, so gradients aren't set directly; rules: false removes the lines under the name and headings. The banner: style glow, image (the newsletter's own picture in banner.image) or none; for the glow, strength 0-100, pattern (0 the classic two glows, any other number up to 9999 a different arrangement, to try a new look) and height (50-240px); fullWidth: true runs it edge to edge instead of across the reading column. For a look of the newsletter's own, headerHtml is HTML that replaces the banner and the name in every edition (a top bar, a nameplate), and footerHtml goes under every edition; {name}, {date} and {subject} are filled in per edition; empty string goes back to the banner and name. Write them for Outlook, as for HTML boxes (see edition_format): tables, inline styles, no scripts. A logo or banner picture must be on this site: media_upload it and use the path it returns (/_emdash/api/media/file/...), a transparent PNG for a logo, a wide PNG or JPEG for a banner; links to other sites are refused. If the result would be hard to read, nothing is saved and saved is false: tell the user the errors and suggest a fix. Tell them any warnings too.",
           route: "theme-update",
           input: themeUpdateInput,
           output: themeUpdateOutput,
