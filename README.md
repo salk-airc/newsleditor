@@ -126,7 +126,7 @@ Claude Code can work on the newsletter through this site's MCP server:
 
 To connect, an Admin opens **Settings**, scrolls to **Connect Claude**, makes a connection, and runs the command it shows in a terminal. From a terminal on the server you can instead run `npm run connect-claude` (with `ADMIN_TOKEN` set to an admin API token, unless you're on `npm run dev`).
 
-The key it makes can read and change all of the site's content and media, as an Admin can. Making a new connection replaces the previous one. After updating newsleditor, connect again: EmDash hides a plugin's tools until an Admin approves their new definitions.
+The key it makes can read and change all of the site's content and media, as an Admin can. Making a new connection replaces the previous one. EmDash hides a plugin's tools from Claude when an update changes them, until an Admin approves them again. The installers do that for you: after an install or update, the app approves the newsletter's tools as they now are, if an Admin had approved them before. Updated some other way (a `git pull`), connect again.
 
 The [skill](.claude/skills/newsleditor/SKILL.md) in this repo tells Claude how this newsletter works: the edition format, the tools, and to write in your voice and never invent facts. Claude Code picks it up when it runs in this folder; to use it elsewhere, copy the folder to `~/.claude/skills/`.
 

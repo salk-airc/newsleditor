@@ -163,6 +163,9 @@ old=""
 if [[ -L "$APP_DIR" ]]; then old="$current"; elif [[ -d "$APP_DIR" ]]; then rm -rf "$APP_DIR"; fi
 ln -sfn "$NEW_DIR" "$APP_DIR"
 [[ -n "$old" && "$old" != "$NEW_DIR" ]] && rm -rf "$old"
+# Claude keeps the newsletter's tools if their definitions changed: the
+# app approves them again on its first request (src/lib/claude-tools.ts).
+touch "$HOME_DIR/data/approve-claude-tools"
 
 # --------------------------------------------------------------- the tunnel --
 
