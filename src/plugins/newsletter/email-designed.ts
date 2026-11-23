@@ -1,5 +1,6 @@
 import { Marked, type Token, type Tokens } from "marked";
 import { type FrameName, groupImageRows, imageHints, PLACEHOLDER, signatureHtml } from "./email.ts";
+import { cleanHtml, HTML_BOX_LANG } from "./html-box.ts";
 import { styledText, stylingCss } from "./styling.ts";
 import { DEFAULT_THEME, bannerUrl, type DrawnArt, FONTS, mix, rgb, ruleUrl, type Theme } from "./theme.ts";
 
@@ -11,13 +12,17 @@ import { DEFAULT_THEME, bannerUrl, type DrawnArt, FONTS, mix, rgb, ruleUrl, type
 // across the top, a masthead with the logo, wordmark and tagline, the name on
 // one line, and section openers underlined with the accent-to-accent2 rule.
 // An "In this edition" list of the sections, for skimmers, is opt-in: a
-// `<!-- contents -->` line anywhere in the body adds it under the name. The
+// `<!-- contents -->` line anywhere in the body adds it under the name. A
+// `<!-- bare -->` line drops the frame (banner, masthead, rules) for an
+// edition that draws its own look in HTML boxes. The
 // reading column stays calm: 16px text, ~70 characters a line.
 //
 // Extra markdown it understands, all plain markdown so the other renderers
 // still read it:
 //
 // - "> " blockquotes become a tinted callout card;
+// - a ```html block is the team's own HTML, cleaned (html-box.ts), for
+//   what markdown can't do;
 // - a paragraph of only [text](url "button") links becomes a button row, the
 //   first one filled, the rest outlined;
 // - image rows get a frame in the theme's colors ("frame=accent2" etc. in
@@ -30,6 +35,7 @@ import { DEFAULT_THEME, bannerUrl, type DrawnArt, FONTS, mix, rgb, ruleUrl, type
 
 const HIGHLIGHT = "; background:#fff3b0";
 const CONTENTS = /^<!--\s*contents\s*-->\s*$/im;
+const BARE = /^<!--\s*bare\s*-->\s*$/im;
 
 export interface RenderDesignedEmailOptions {
   /** Subject line, e.g. "Field Notes — Oct 2, 2026". Used for the <title>. */
@@ -107,7 +113,16 @@ function style(theme: Theme, site: string, media: string | null, drawn?: DrawnAr
 
 export function renderDesignedEmail(markdown: string, options: RenderDesignedEmailOptions): string {
   const resolveImage = options.resolveImage ?? ((src) => src);
-  const s = style(options.theme ?? DEFAULT_THEME, options.site, options.media ?? null, options.drawn);
+  // A bare edition draws its own look in HTML boxes: no banner, masthead,
+  // header or rules. A theme with its own header has no banner or masthead.
+  const bare = BARE.test(markdown);
+  const themed = options.theme ?? DEFAULT_THEME;
+  const header = bare ? "" : themed.headerHtml.trim();
+  const theme =
+    bare || header
+      ? { ...themed, rules: bare ? false : themed.rules, banner: { ...themed.banner, style: "none" as const } }
+      : themed;
+  const s = style(theme, options.site, options.media ?? null, options.drawn);
   const P = `${s.font}; font-size:16px; line-height:1.7; color:${s.ink}; margin:0 0 18px`;
   const md = new Marked();
 
@@ -128,6 +143,11 @@ export function renderDesignedEmail(markdown: string, options: RenderDesignedEma
         const buttons = buttonLinks(token);
         if (buttons) return buttonRow(s, buttons, (t) => this.parser.parseInline(t));
         return `<p style="${P}${PLACEHOLDER.test(token.text) ? HIGHLIGHT : ""}">${this.parser.parseInline(token.tokens)}</p>\n`;
+      },
+      // An HTML box (html-box.ts), cleaned; other code blocks as marked has them.
+      code({ text, lang }) {
+        if (lang?.trim().toLowerCase() !== HTML_BOX_LANG) return false;
+        return `<div style="margin:0 0 18px">${cleanHtml(text, resolveImage, PLACEHOLDER).html}</div>\n`;
       },
       blockquote({ tokens }) {
         return (
@@ -222,7 +242,11 @@ export function renderDesignedEmail(markdown: string, options: RenderDesignedEma
     // The banner is a picture at the top of the column (the glow faded to
     // the page color at its edges); the masthead under it stays real text.
     (banner && !s.theme.banner.fullWidth ? column("0", bannerImg(banner, false)) : "") +
-    `${column(glowAbove ? "0 28px 30px" : banner ? "26px 28px 30px" : "34px 28px 30px", masthead(s, options, sections, glowAbove))}</td></tr>` +
+    (bare
+      ? `${column("28px 28px 0", "")}</td></tr>`
+      : header
+        ? `${column("28px 28px 8px", cleanHtml(fillIn(header, s, options), resolveImage).html)}</td></tr>`
+        : `${column(glowAbove ? "0 28px 30px" : banner ? "26px 28px 30px" : "34px 28px 30px", masthead(s, options, sections, glowAbove))}</td></tr>`) +
     `<tr><td align="center" style="padding:0 12px">` +
     `${column("8px 28px 32px", `\n${body}${signature}\n`)}` +
     (s.theme.footer
@@ -230,6 +254,9 @@ export function renderDesignedEmail(markdown: string, options: RenderDesignedEma
           "0 28px 28px",
           `<p style="${s.font}; font-size:12px; line-height:1.6; color:${s.muted}; margin:0">${escapeHtml(s.theme.footer)}</p>`,
         )
+      : "") +
+    (s.theme.footerHtml.trim()
+      ? column("0 28px 28px", cleanHtml(fillIn(s.theme.footerHtml, s, options), resolveImage).html)
       : "") +
     `</td></tr></table></body></html>`
   );
@@ -251,11 +278,24 @@ function bannerImg(banner: { src: string; height: number | null }, full: boolean
   return `<img alt="" data-banner src="${escapeAttr(banner.src)}" ${size}>`;
 }
 
+/** The edition's date: given, or whatever follows " — " in "Field Notes — Oct 2, 2026". */
+function editionDate(options: RenderDesignedEmailOptions): string {
+  return options.date ?? (options.title.split(/\s+—\s+/)[1] ?? "").replace(/\s*Edition\s*$/i, "");
+}
+
+/** A theme's own header or footer with {name}, {date} and {subject} filled in, as text. */
+function fillIn(html: string, s: Style, options: RenderDesignedEmailOptions): string {
+  const values: Record<string, string> = {
+    name: [s.theme.nameLead, s.theme.nameTail].filter(Boolean).join(" "),
+    date: editionDate(options),
+    subject: options.title,
+  };
+  return html.replace(/\{(name|date|subject)\}/g, (_, key: string) => escapeHtml(values[key]!));
+}
+
 function masthead(s: Style, options: RenderDesignedEmailOptions, sections: string[], underBanner: boolean): string {
-  const { title } = options;
   const { theme } = s;
-  // No date given: whatever follows " — " in "Field Notes — Oct 2, 2026".
-  const date = options.date ?? (title.split(/\s+—\s+/)[1] ?? "").replace(/\s*Edition\s*$/i, "");
+  const date = editionDate(options);
   // Through resolveImage like the body's images, so it loads from the same place.
   const logo = theme.logo ? new URL((options.resolveImage ?? ((src) => src))(theme.logo), s.site).href : null;
   const tagline = theme.tagline.split(/\n/).map(escapeHtml).join("<br>");

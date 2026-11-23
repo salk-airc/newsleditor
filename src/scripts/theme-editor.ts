@@ -1,5 +1,6 @@
 import { editionTitle, formatDate, nextOpenEditionDate, starterBody } from "../plugins/newsletter/editions.ts";
 import { renderDesignedEmail } from "../plugins/newsletter/email-designed.ts";
+import { exampleHeader } from "../plugins/newsletter/html-box.ts";
 import { DEFAULT_SETTINGS, type Settings } from "../plugins/newsletter/settings.ts";
 import {
   checkTheme,
@@ -107,7 +108,7 @@ export function startThemeEditor(root: HTMLElement) {
   function fill(t: Theme) {
     text("name").value = t.nameTail ? `${t.nameLead} ${t.nameTail}` : t.nameLead;
     accentChoices(words(t.nameTail).length);
-    for (const name of ["footer", "wordmark", "tagline", "font"] as const) text(name).value = t[name];
+    for (const name of ["footer", "wordmark", "tagline", "font", "headerHtml", "footerHtml"] as const) text(name).value = t[name];
     setColors(t.colors);
     $<HTMLSelectElement>("[data-banner-style]").value = t.banner.style;
     $<HTMLInputElement>("[data-banner-strength]").value = String(t.banner.strength);
@@ -142,6 +143,8 @@ export function startThemeEditor(root: HTMLElement) {
         fullWidth: $<HTMLInputElement>("[data-banner-full]").checked,
       },
       rules: $<HTMLInputElement>("[data-rules-on]").checked,
+      headerHtml: text("headerHtml").value,
+      footerHtml: text("footerHtml").value,
     };
   }
 
@@ -337,6 +340,14 @@ export function startThemeEditor(root: HTMLElement) {
     update();
   });
   dark.addEventListener("change", render);
+
+  // A header to start from, in the theme's colors, with the fill-ins in place.
+  $<HTMLButtonElement>("[data-header-example]").addEventListener("click", () => {
+    const field = text("headerHtml");
+    if (field.value.trim() && !confirm("Replace the header with the example?")) return;
+    field.value = exampleHeader(theme.colors);
+    update();
+  });
 
   $<HTMLInputElement>("[data-logo-file]").addEventListener("change", async (e) => {
     const input = e.target as HTMLInputElement;

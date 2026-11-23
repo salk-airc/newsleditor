@@ -18,13 +18,14 @@ import { tags as t } from "@lezer/highlight";
 import { yCollab, yUndoManagerKeymap } from "y-codemirror.next";
 import { WebsocketProvider } from "y-websocket";
 import * as Y from "yjs";
-import { joinedToBullet, placeholders, wordCount } from "../plugins/newsletter/checks.ts";
+import { htmlBoxProblems, joinedToBullet, placeholders, wordCount } from "../plugins/newsletter/checks.ts";
+import { starterBox } from "../plugins/newsletter/html-box.ts";
 import { type Frame, type FrameName, imageHints } from "../plugins/newsletter/email.ts";
 import { frameColors, renderDesignedEmail } from "../plugins/newsletter/email-designed.ts";
 import { formatDate } from "../plugins/newsletter/editions.ts";
 import { openImageTag } from "../plugins/newsletter/opens.ts";
 import { DEFAULT_SETTINGS, type Settings } from "../plugins/newsletter/settings.ts";
-import { BANNER_HEIGHT, DEFAULT_THEME, type Theme } from "../plugins/newsletter/theme.ts";
+import { BANNER_HEIGHT, DEFAULT_THEME, mix, type Theme } from "../plugins/newsletter/theme.ts";
 import { plugin, uploadImage as upload } from "./emdash-api.ts";
 import { renderSlack } from "../plugins/newsletter/slack.ts";
 import {
@@ -452,7 +453,9 @@ export async function startEditor(root: HTMLElement): Promise<void> {
     // Always there, so the text never moves; usable once there's something to style.
     const off = sel.empty && !styled;
     // Lists work on the cursor's line too.
-    textBar.querySelectorAll<HTMLButtonElement>("button:not([data-text-list])").forEach((b) => (b.disabled = off));
+    textBar
+      .querySelectorAll<HTMLButtonElement>("button:not([data-text-list]):not([data-insert-html])")
+      .forEach((b) => (b.disabled = off));
     customColor.disabled = off;
     const kind = listKind(v);
     textBar.querySelectorAll<HTMLButtonElement>("[data-text-list]").forEach((b) => {
@@ -565,6 +568,24 @@ export async function startEditor(root: HTMLElement): Promise<void> {
   textBar.querySelectorAll<HTMLButtonElement>("[data-text-list]").forEach((b) =>
     b.addEventListener("click", () => toggleList(b.dataset.textList as ListKind)),
   );
+
+  // An HTML box (html-box.ts) after the cursor's line, as its own block,
+  // starting from an Outlook-safe example in the theme's colors.
+  $<HTMLButtonElement>("[data-insert-html]").addEventListener("click", () => {
+    const { accent, ink } = theme.colors;
+    const box = starterBox({ tint: mix(accent, "#ffffff", 0.08), border: mix(accent, "#ffffff", 0.3), accent, ink });
+    const line = editor.state.doc.lineAt(editor.state.selection.main.head);
+    const before = line.text.trim() ? "\n\n" : line.number > 1 ? "\n" : "";
+    const insert = `${before}${box}\n\n`;
+    const at = line.text.trim() ? line.to : line.from;
+    editor.dispatch({
+      changes: { from: at, to: line.text.trim() ? at : line.to, insert },
+      // The example's title, selected, ready to type over.
+      selection: { anchor: at + insert.indexOf("A title"), head: at + insert.indexOf("A title") + "A title".length },
+      scrollIntoView: true,
+    });
+    editor.focus();
+  });
 
   textBar.querySelectorAll<HTMLButtonElement>("[data-text-wrap]").forEach((b) =>
     b.addEventListener("click", () => toggleWrap(b.dataset.textWrap!)),
@@ -902,6 +923,7 @@ export async function startEditor(root: HTMLElement): Promise<void> {
     const todo = placeholders(md);
     if (todo.length) items.push([`Placeholders left: ${todo.join(", ")}`, true]);
     for (const line of joinedToBullet(md)) items.push([`Joins the bullet above (add a blank line): “${line}”`, true]);
+    if (doc === "body") for (const problem of htmlBoxProblems(md)) items.push([problem, true]);
     checks.replaceChildren(
       ...items.map(([label, warn]) => {
         const li = document.createElement("li");

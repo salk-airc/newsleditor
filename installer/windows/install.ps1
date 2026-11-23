@@ -259,6 +259,9 @@ if ($task) { Stop-ScheduledTask -TaskName $TaskName }
 # scripts\start.mjs runs the server as a second node process, which can outlive the task: stop ours.
 Get-Process node -ErrorAction SilentlyContinue | Where-Object { $_.Path -eq $node } | Stop-Process -Force
 Start-Sleep -Seconds 2
+# Claude keeps the newsletter's tools if their definitions changed: the
+# app approves them again on its first request (src\lib\claude-tools.ts).
+New-Item -ItemType File -Force -Path (Join-Path $DataRoot "data\approve-claude-tools") | Out-Null
 
 # ------------------------------------------------------------- the tunnel --
 
